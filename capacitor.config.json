@@ -1,0 +1,7 @@
+{
+  "appId": "app.miras.archive",
+  "appName": "Miras",
+  "webDir": "www",
+  "android": { "allowMixedContent": false },
+  "plugins": { "PrivacyScreen": { "enable": true } }
+}
