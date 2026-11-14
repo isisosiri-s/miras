@@ -27,4 +27,11 @@ fs.writeFileSync(path.join(any, 'ic_launcher.xml'), adaptive);
 fs.writeFileSync(path.join(any, 'ic_launcher_round.xml'), adaptive);
 // remove template vector foreground/background that could clash
 for (const f of ['drawable-v24/ic_launcher_foreground.xml', 'drawable/ic_launcher_background.xml']) { const p = path.join(res, f); if (fs.existsSync(p)) fs.unlinkSync(p); }
+// 4) sign debug builds with the permanent key at ~/.android/debug.keystore (explicit, so Gradle cannot create a random one)
+const gp = 'android/app/build.gradle';
+let g = fs.readFileSync(gp, 'utf8');
+if (!g.includes('MIRAS_SIGNING')) {
+  g += `\n// MIRAS_SIGNING\nandroid {\n    signingConfigs {\n        debug {\n            storeFile file("${'$'}{System.getProperty('user.home')}/.android/debug.keystore")\n            storePassword 'android'\n            keyAlias 'androiddebugkey'\n            keyPassword 'android'\n        }\n    }\n}\n`;
+  fs.writeFileSync(gp, g);
+}
 console.log('android patched');

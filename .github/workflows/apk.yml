@@ -35,10 +35,19 @@ jobs:
           sed -i "s/versionCode 1/versionCode ${{ github.run_number }}/; s/versionName \"1.0\"/versionName \"1.1.${{ github.run_number }}\"/" android/app/build.gradle
           cd android && chmod +x gradlew && ./gradlew assembleDebug --no-daemon
           cp app/build/outputs/apk/debug/app-debug.apk ../Miras.apk
-      - name: Show signing certificate fingerprint
+      - name: Verify signing certificate
+        env:
+          KS: ${{ secrets.ANDROID_KEYSTORE_B64 }}
         run: |
           AS=$(ls $ANDROID_HOME/build-tools/*/apksigner | tail -1)
-          $AS verify --print-certs Miras.apk | grep -i "SHA-256\|Signer"
+          GOT=$($AS verify --print-certs Miras.apk | grep "SHA-256 digest" | head -1 | awk '{print $NF}')
+          echo "APK certificate SHA-256: $GOT"
+          if [ -n "$KS" ]; then
+            WANT=$(keytool -list -v -keystore ~/.android/debug.keystore -storepass android 2>/dev/null | grep "SHA256:" | head -1 | awk '{print $2}' | tr -d ':' | tr 'A-F' 'a-f')
+            echo "Expected (permanent key): $WANT"
+            if [ "$GOT" != "$WANT" ]; then echo "ERROR: APK is NOT signed with the permanent key"; exit 1; fi
+            echo "OK: signed with the permanent key"
+          fi
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: v1.1.${{ github.run_number }}
