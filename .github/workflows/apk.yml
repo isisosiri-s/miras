@@ -21,6 +21,9 @@ jobs:
           if [ -n "$KS" ]; then
             echo "$KS" | tr -d ' \r\n' | base64 -d > ~/.android/debug.keystore
             echo "PERMANENT KEY IN USE"
+            echo "decoded keystore sha256: $(sha256sum ~/.android/debug.keystore | cut -c1-16)"
+            keytool -list -keystore ~/.android/debug.keystore -storepass android 2>&1 | grep -i "fingerprint\|Alias\|error\|exception" || true
+            echo "HOME=$HOME ANDROID_USER_HOME=$ANDROID_USER_HOME"
           else
             echo "WARNING: secret ANDROID_KEYSTORE_B64 not found - random key will be used"
           fi
