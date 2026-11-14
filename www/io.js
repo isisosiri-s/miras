@@ -246,7 +246,7 @@ function applyImport(plan, rv, dups) {
     for (const c of newCols) { const v = convertCell(c.kind, plan.body[i][c.idx]); if (v !== '' && v !== false || c.kind === 'check') vals[c.key] = v; }
     return vals;
   };
-  const created = new Map();
+  const created = new Map(); let nid = maxId() + 1;
   for (let i = 0; i < rv.length; i++) {
     const v = rv[i].vals; if (!v.inv) { stats.skipped++; continue; }
     const d = dmap.get(i);
@@ -257,7 +257,7 @@ function applyImport(plan, rv, dups) {
       if (Object.keys(upd).length) updateRecord(ex, upd);
       stats.updated++; continue;
     }
-    const r = newRecord(fullVals(i), base + i); created.set(i, r); stats.added++;
+    const r = newRecord(fullVals(i), base + i, nid++); created.set(i, r); stats.added++;
   }
   scheduleSave();
   return stats;

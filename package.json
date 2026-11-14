@@ -2,7 +2,7 @@
   "name": "miras",
   "productName": "Miras",
   "version": "1.0.0",
-  "description": "Miras — offline archive of manuscripts and books",
+  "description": "Miras \u2014 offline archive of manuscripts and books",
   "main": "electron/main.js",
   "scripts": {
     "pc": "electron .",
@@ -19,7 +19,8 @@
     "@capacitor/filesystem": "^8.0.0",
     "@capacitor/share": "^8.0.0",
     "@capacitor-community/privacy-screen": "^8.0.0",
-    "capacitor-native-biometric": "^4.2.2"
+    "capacitor-native-biometric": "^4.2.2",
+    "@capacitor/status-bar": "^8.0.0"
   },
   "devDependencies": {
     "@capacitor/cli": "^8.0.0",
@@ -29,9 +30,23 @@
   "build": {
     "appId": "app.miras.archive",
     "productName": "Miras",
-    "directories": { "output": "dist" },
-    "files": ["electron/**", "www/**", "package.json"],
-    "win": { "target": ["portable"], "icon": "www/icon-512.png", "signAndEditExecutable": false },
-    "portable": { "artifactName": "Miras.exe" }
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "electron/**",
+      "www/**",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "portable"
+      ],
+      "icon": "www/icon-512.png",
+      "signAndEditExecutable": false
+    },
+    "portable": {
+      "artifactName": "Miras.exe"
+    }
   }
 }

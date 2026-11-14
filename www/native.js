@@ -26,6 +26,8 @@ const Native = {
   },
   async bioClear() { try { const p = this.plugin('NativeBiometric'); if (p) await p.deleteCredentials({ server: 'miras.local' }); } catch { } },
   async hasBioCreds() { try { const p = this.plugin('NativeBiometric'); if (!p) return false; await p.getCredentials({ server: 'miras.local' }); return true; } catch { return false; } },
+  // status bar: light icons on our dark brown bar
+  async initBars() { const p = this.plugin('StatusBar'); if (p) { try { await p.setStyle({ style: 'DARK' }); } catch (e) { console.warn('sb', e); } } },
   // back button / minimise
   minimize() { const p = this.plugin('App'); if (p && p.minimizeApp) p.minimizeApp(); },
   onBackButton(fn) { const p = this.plugin('App'); if (p && p.addListener) p.addListener('backButton', fn); },

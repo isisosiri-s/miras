@@ -1,6 +1,6 @@
 'use strict';
 /* Miras core: i18n, utils, crypto, storage, data model */
-const APP_VERSION = '1.0.0';
+const APP_VERSION = '1.1.0';
 const PBKDF_ITER = 250000;
 const TRASH_DAYS = 30;
 
@@ -174,7 +174,7 @@ function defaultColumns() {
 
 // ---------- global state ----------
 const H = { // header: not encrypted
-  v: 1, lang: 'ru', theme: 'light', font: 'm', autolock: 60, shot: true, bio: false, enc: true,
+  v: 1, lang: 'ru', theme: 'light', font: 'm', autolock: 60, shot: true, bio: false, enc: false, pinLen: 0,
   deviceId: '', pw: null, rec: null, lock: { fails: 0, until: 0 }, lastBackup: 0, setupDone: false,
 };
 const DB = { // data: only in memory while unlocked
@@ -195,7 +195,7 @@ function applyPrefs() {
 async function saveHeader() { await KV.set('header', JSON.parse(JSON.stringify(H))); }
 async function loadHeader() {
   const h = await KV.get('header');
-  if (h) Object.assign(H, h);
+  if (h) { Object.assign(H, h); delete H.rec; }
   else { H.lang = detectLang(); H.deviceId = uuid(); }
   if (!H.deviceId) H.deviceId = uuid();
   applyPrefs();
@@ -232,53 +232,55 @@ function loadDataObj(o) {
 }
 
 // ---------- auth ----------
+// PIN is optional. Without a PIN the data is stored unencrypted and the app opens directly.
+// With a PIN: random data key wrapped by the PIN, data encrypted with AES-256-GCM.
+const PIN_RE = /^\d{4,6}$/;
 const Auth = {
-  async setup(pw) {
-    const raw = crypto.getRandomValues(new Uint8Array(32));
-    const code = genRecoveryCode();
-    H.pw = await wrapRaw(pw, raw);
-    H.rec = await wrapRaw(canonRecovery(code), raw);
-    H.enc = true; H.setupDone = true; H.lock = { fails: 0, until: 0 };
-    DB._rawDK = raw; DB._dk = await importDK(raw); DB._pw = pw;
+  hasPin() { return !!H.pw; },
+  async setup(pin) {
+    H.setupDone = true; H.lock = { fails: 0, until: 0 }; delete H.rec;
     DB.records = []; DB.columns = defaultColumns(); DB.colsTs = 0; DB.draft = null; DB.unlocked = true;
+    if (pin) {
+      const raw = crypto.getRandomValues(new Uint8Array(32));
+      H.pw = await wrapRaw(pin, raw); H.enc = true; H.pinLen = pin.length;
+      DB._rawDK = raw; DB._dk = await importDK(raw); DB._pw = pin;
+    } else { H.pw = null; H.enc = false; H.pinLen = 0; }
     await saveHeader(); await writeData();
-    return code;
+  },
+  // turn the PIN on later (from settings)
+  async enablePin(pin) {
+    const raw = crypto.getRandomValues(new Uint8Array(32));
+    H.pw = await wrapRaw(pin, raw); H.enc = true; H.pinLen = pin.length; H.lock = { fails: 0, until: 0 };
+    DB._rawDK = raw; DB._dk = await importDK(raw); DB._pw = pin;
+    await saveHeader(); await writeData();
+  },
+  // turn the PIN off (caller verified the PIN)
+  async disablePin() {
+    H.pw = null; H.enc = false; H.pinLen = 0; H.bio = false;
+    DB._rawDK = null; DB._dk = null; DB._pw = null;
+    await saveHeader(); await writeData();
   },
   lockInfo() {
     const now = Date.now(); const L = H.lock;
-    return { fails: L.fails, wait: Math.max(0, Math.ceil((L.until - now) / 1000)), recOnly: L.fails >= 9, left: L.fails >= 9 ? 0 : 3 - (L.fails % 3) };
+    return { fails: L.fails, wait: Math.max(0, Math.ceil((L.until - now) / 1000)), recOnly: false, left: 3 - (L.fails % 3) };
   },
   async _fail() {
     H.lock.fails++;
-    if (H.lock.fails % 3 === 0) { const st = H.lock.fails / 3; H.lock.until = Date.now() + (st === 1 ? 30000 : st === 2 ? 300000 : 0); }
+    if (H.lock.fails % 3 === 0) { const st = H.lock.fails / 3; H.lock.until = Date.now() + (st === 1 ? 30000 : 300000); }
     await saveHeader();
   },
   async unlock(pw) {
     const li = this.lockInfo();
-    if (li.wait > 0 || li.recOnly) return { ok: false, ...li };
+    if (li.wait > 0) return { ok: false, ...li };
     let raw;
     try { raw = await unwrapRaw(pw, H.pw); } catch { await this._fail(); return { ok: false, ...this.lockInfo(), wrong: true }; }
     H.lock = { fails: 0, until: 0 }; await saveHeader();
     await this._open(raw, pw);
     return { ok: true };
   },
-  async unlockRecovery(code, newPw) {
-    const li = this.lockInfo();
-    if (li.wait > 0 && !li.recOnly) return { ok: false, ...li };
-    let raw;
-    try { raw = await unwrapRaw(canonRecovery(code), H.rec); } catch {
-      H.lock.recFails = (H.lock.recFails || 0) + 1;
-      if (H.lock.recFails % 3 === 0) H.lock.until = Date.now() + 300000;
-      await saveHeader(); return { ok: false, wrong: true, wait: Math.max(0, Math.ceil((H.lock.until - Date.now()) / 1000)) };
-    }
-    H.pw = await wrapRaw(newPw, raw);
-    const newCode = genRecoveryCode(); H.rec = await wrapRaw(canonRecovery(newCode), raw);
-    H.lock = { fails: 0, until: 0, recFails: 0 }; await saveHeader();
-    await this._open(raw, newPw);
-    return { ok: true, newCode };
-  },
+  async openPlain() { await this._open(null, null); },
   async _open(raw, pw) {
-    DB._rawDK = raw; DB._dk = await importDK(raw); DB._pw = pw;
+    DB._rawDK = raw; DB._dk = raw ? await importDK(raw) : null; DB._pw = pw;
     const data = await KV.get('data');
     if (data == null) { loadDataObj({}); }
     else if (typeof data === 'string') loadDataObj(JSON.parse(data));
@@ -287,12 +289,7 @@ const Auth = {
     purgeOldTrash();
   },
   async verifyPw(pw) { try { await unwrapRaw(pw, H.pw); return true; } catch { return false; } },
-  async changePw(newPw) { H.pw = await wrapRaw(newPw, DB._rawDK); DB._pw = newPw; await saveHeader(); },
-  async newRecovery() { const code = genRecoveryCode(); H.rec = await wrapRaw(canonRecovery(code), DB._rawDK); await saveHeader(); return code; },
-  async setEncryption(on) {
-    if (on === H.enc) return;
-    H.enc = on; await saveHeader(); await writeData();
-  },
+  async changePw(newPw) { H.pw = await wrapRaw(newPw, DB._rawDK); H.pinLen = newPw.length; DB._pw = newPw; await saveHeader(); },
   async lockNow() {
     clearTimeout(_saveTimer);
     await flushSave();
@@ -325,14 +322,19 @@ function findByInv(inv, exceptUuid) {
   return r && r.uuid !== exceptUuid ? r : null;
 }
 function nameKey(r) { return norm(r.title || '') + '|' + norm(r.author || ''); }
+function nameMap() {
+  if (DB._nameMap && DB._nameRev === DB.rev) return DB._nameMap;
+  const m = new Map();
+  for (const r of DB.records) if (isLive(r)) { const k = nameKey(r); if (!m.has(k)) m.set(k, r); }
+  DB._nameMap = m; DB._nameRev = DB.rev; return m;
+}
 function findByName(title, author, exceptUuid) {
   if (norm(title).length < 2) return null;
-  const k = norm(title) + '|' + norm(author || '');
-  for (const r of DB.records) if (isLive(r) && r.uuid !== exceptUuid && nameKey(r) === k) return r;
-  return null;
+  const r = nameMap().get(norm(title) + '|' + norm(author || ''));
+  return r && r.uuid !== exceptUuid ? r : null;
 }
-function newRecord(vals, created) {
-  const r = { uuid: uuid(), id: maxId() + 1, created: created || Date.now(), del: 0, vv: {}, ts: 0 };
+function newRecord(vals, created, forcedId) {
+  const r = { uuid: uuid(), id: forcedId || maxId() + 1, created: created || Date.now(), del: 0, vv: {}, ts: 0 };
   for (const k of FIELD_KEYS) r[k] = k === 'scanned' ? false : '';
   Object.assign(r, vals); touch(r);
   DB.records.push(r); if (DB._byUuid) DB._byUuid.set(r.uuid, r);
@@ -371,6 +373,9 @@ function counts() {
 
 // ---------- columns ----------
 function visibleCols() { return DB.columns.filter(c => !c.del && !c.hidden); }
+// phone list: ID, inventory number, title and scan flag by default; the user can toggle any column
+const PHONE_DEFAULT = ['id', 'inv', 'title', 'scanned'];
+function onPhone(c) { return c.ph !== undefined ? !!c.ph : PHONE_DEFAULT.includes(c.key); }
 function liveCols() { return DB.columns.filter(c => !c.del); }
 function colDef(key) { return DB.columns.find(c => c.key === key && !c.del); }
 function builtinOf(key) { return BUILTIN_COLS.find(b => b.key === key); }

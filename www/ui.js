@@ -14,6 +14,7 @@ const IC = {
   up: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg>',
   down: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>',
   eye: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
+  phone: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2.5" width="10" height="19" rx="2.2"/><path d="M11 18.5h2"/></svg>',
   eyeoff: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18"/><path d="M10.6 5.1A10 10 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3.2 4M6.5 6.6A17 17 0 0 0 2 12s3.6 7 10 7c1.6 0 3-.4 4.3-1"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>',
   lock: (s = 20, c = 'currentColor') => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>`,
   book: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2V5z"/><path d="M19 19v2H6"/></svg>',
@@ -92,14 +93,46 @@ function ask({ title, text, html, buttons, onMount, dismiss = true }) {
   });
 }
 const confirmDlg = (text, okLabel, bad) => ask({ title: t('conf_title'), text, buttons: [{ label: t('btn_cancel'), v: false, cls: 'b2' }, { label: okLabel || t('ok'), v: true, cls: bad ? 'bad' : 'b1' }] });
-async function askPassword(text) {
+// PIN prompts use the same on-screen pad (see padHtml/mountPad below; hoisted functions)
+const askPassword = text => pinFlow(t('conf_title'), { cur: true, text });
+
+// busy overlay: lets the browser paint before heavy synchronous work (big Excel files)
+const tick = () => new Promise(r => requestAnimationFrame(() => setTimeout(r, 30)));
+async function withBusy(text, fn) {
+  const d = document.createElement('div'); d.className = 'busy';
+  d.innerHTML = `<div class="busybox"><div class="spin"></div><div>${esc(text)}</div></div>`;
+  document.body.appendChild(d); await tick();
+  try { return await fn(); } finally { d.remove(); }
+}
+const askNewPin = (title, needCur) => pinFlow(title, { cur: !!needCur, create: true });
+// stages: current PIN (verify) -> new PIN (4-6 digits) -> confirmation. Resolves with the PIN or null.
+function pinFlow(title, { cur, create, text }) {
+  let stage = cur ? 'cur' : 'new', first = null, pad, mbEl, fin;
+  const sub = () => ({ cur: t('pw_cur'), new: t('pw_new'), cfm: t('setup_pw2') }[stage]);
+  const render = () => {
+    mbEl.querySelector('.padm').innerHTML = `<div class="psub">${esc(sub())}</div>${padHtml()}<div class="msg" id="pmsg"></div><button class="btn b1" id="pnext" style="display:none;width:100%;margin-top:6px">${t('ok')}</button>`;
+    const msg = mbEl.querySelector('#pmsg'), nx = mbEl.querySelector('#pnext');
+    const bad = m => { msg.textContent = m; pad.shake(); setTimeout(() => pad.clear(), 380); };
+    const go = async v => {
+      if (stage === 'cur') {
+        if (!(await Auth.verifyPw(v))) return bad(t('pw_wrong'));
+        if (!create) return fin(v);
+        first = v; stage = 'new'; first = null; render();
+      } else if (stage === 'new') {
+        if (!PIN_RE.test(v)) return bad(t('setup_err_short'));
+        first = v; stage = 'cfm'; render();
+      } else { if (v !== first) return bad(t('setup_err_match')); fin(v); }
+    };
+    pad = mountPad(mbEl, {
+      fixed: stage === 'cur' ? H.pinLen : stage === 'cfm' ? first.length : 0, max: 6,
+      onChange: v => { msg.textContent = ''; nx.style.display = stage === 'new' && v.length >= 4 ? '' : 'none'; },
+      onDone: go,
+    });
+    nx.onclick = () => go(pad.get());
+  };
   return ask({
-    title: t('conf_title'), text, html: `<input class="inp" id="dp" type="password" autocomplete="off">`,
-    buttons: [{ label: t('btn_cancel'), v: null }, {
-      label: t('ok'), cls: 'b1',
-      check: async m => { const ok = await Auth.verifyPw($('#dp', m).value); if (!ok) { toast(t('pw_wrong')); return false; } return true; },
-      v: m => $('#dp', m).value
-    }],
+    title, text, html: '<div class="padm"></div>', buttons: [{ label: t('btn_cancel'), v: null }],
+    onMount: (mb, finish) => { mbEl = mb; fin = finish; render(); },
   });
 }
 
@@ -112,96 +145,110 @@ function bindLangRow(root, rerender) {
 }
 function fmtWait(s) { return s >= 60 ? t('t_min', { n: Math.floor(s / 60) }) + ' ' + t('t_sec', { n: s % 60 }) : t('t_sec', { n: s }); }
 
+
+// ---------- on-screen PIN pad (no system keyboard) ----------
+function padHtml(extraLeft) {
+  return `<div class="pdots" id="pdots"></div><div class="pad" id="pad">${[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => `<button type="button" data-k="${n}">${n}</button>`).join('')}${extraLeft || '<span></span>'}<button type="button" data-k="0">0</button><button type="button" data-k="del" class="del" aria-label="Delete"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 5H9l-6 7 6 7h12z"/><path d="M13 9.5l4 5M17 9.5l-4 5"/></svg></button></div>`;
+}
+// fixed: number of dots (PIN length) or 0 = variable (4..max). Returns controller.
+function mountPad(root, { fixed = 0, max = 6, onChange, onDone }) {
+  let v = '', off = false;
+  const dots = $('#pdots', root);
+  const draw = () => {
+    const n = fixed || Math.max(4, v.length);
+    dots.innerHTML = Array.from({ length: n }, (_, i) => `<i class="pdot${i < v.length ? ' on' : ''}"></i>`).join('');
+  };
+  const press = k => {
+    if (off) return;
+    if (k === 'del') v = v.slice(0, -1);
+    else if (/^\d$/.test(k) && v.length < (fixed || max)) v += k; else return;
+    draw(); onChange && onChange(v);
+    if (fixed && v.length === fixed) onDone && onDone(v);
+  };
+  $$('#pad button[data-k]', root).forEach(b => b.onclick = () => press(b.dataset.k));
+  const kd = e => {
+    if (!document.body.contains(dots)) { document.removeEventListener('keydown', kd); return; }
+    if (/^\d$/.test(e.key)) press(e.key); else if (e.key === 'Backspace') press('del');
+    else if (e.key === 'Enter' && !fixed && v.length >= 4) onDone && onDone(v);
+  };
+  document.addEventListener('keydown', kd);
+  draw();
+  return {
+    get: () => v, clear() { v = ''; draw(); onChange && onChange(v); },
+    shake() { dots.classList.remove('shake'); void dots.offsetWidth; dots.classList.add('shake'); },
+    disable(b) { off = !!b; $('#pad', root).classList.toggle('off', !!b); },
+  };
+}
+
 let _lockTimer = null;
+const digitsOnly = el => { el.value = el.value.replace(/\D/g, '').slice(0, 6); };
 async function showLock() {
   UI.layers = []; clearInterval(_lockTimer);
   const el = appEl();
   const bioOk = H.bio && Native.isApp && await Native.hasBioCreds();
-  el.innerHTML = `<div class="lockscr"><div class="lockbox">${langRow()}
-    <div style="display:flex;justify-content:center">${logoSvg(96)}</div>
+  const bioBtn = bioOk ? `<button type="button" id="bio" class="bio" aria-label="${esc(t('lock_bio'))}">${IC.finger.replace('currentColor', '#E3D3B4')}</button>` : '';
+  el.innerHTML = `<div class="lockscr"><div class="lockbox pinbox">${langRow()}
+    <div style="display:flex;justify-content:center">${logoSvg(72)}</div>
     <h1>Miras</h1><div class="sub">${t('tagline')}</div>
-    <input id="pw" type="password" placeholder="${esc(t('lock_enter'))}" autocomplete="off" enterkeyhint="go">
+    ${padHtml(bioBtn)}
     <div class="msg" id="msg"></div>
-    <button class="bgold" id="go">${t('lock_unlock')}</button>
-    ${bioOk ? `<button class="lnk" id="bio">${IC.finger.replace('currentColor', '#E3D3B4')} ${t('lock_bio')}</button>` : ''}
-    <button class="lnk" id="forgot">${t('lock_forgot')}</button>
     <div class="foot">${IC.lock(14, '#CDBB9D')} ${t('lock_encrypted')}</div></div></div>`;
   bindLangRow(el, showLock);
-  const msg = $('#msg'), pw = $('#pw'), go = $('#go');
+  const msg = $('#msg');
+  let busy = false, pad;
   const refresh = () => {
     const li = Auth.lockInfo();
-    if (li.recOnly) { msg.textContent = t('lock_only_rec'); go.disabled = true; pw.disabled = true; return; }
-    if (li.wait > 0) { msg.textContent = t('lock_wait', { t: fmtWait(li.wait) }); go.disabled = true; pw.disabled = true; return; }
-    go.disabled = false; pw.disabled = false;
-    if (msg.dataset.wrong && li.fails % 3 !== 0 || (li.fails > 0 && msg.dataset.wrong)) msg.textContent = t('lock_wrong') + ' · ' + t('lock_attempts', { n: li.left });
-    else if (!msg.dataset.wrong) msg.textContent = li.fails > 0 ? t('lock_attempts', { n: li.left }) : '';
+    if (li.wait > 0) { msg.textContent = t('lock_wait', { t: fmtWait(li.wait) }); pad.disable(true); return; }
+    pad.disable(busy);
+    if (msg.dataset.wrong) msg.textContent = t('lock_wrong') + ' · ' + t('lock_attempts', { n: li.left });
+    else msg.textContent = li.fails > 0 ? t('lock_attempts', { n: li.left }) : '';
   };
-  refresh(); _lockTimer = setInterval(refresh, 1000);
-  const submit = async () => {
-    if (!pw.value) return;
-    go.disabled = true; const r = await Auth.unlock(pw.value);
+  const submit = async v => {
+    if (busy) return;
+    busy = true; pad.disable(true);
+    const r = await Auth.unlock(v);
     if (r.ok) { clearInterval(_lockTimer); return afterUnlock(); }
-    pw.value = ''; msg.dataset.wrong = '1'; refresh(); if (!pw.disabled) pw.focus();
+    busy = false; msg.dataset.wrong = '1'; pad.shake();
+    setTimeout(() => { pad.clear(); refresh(); }, 380);
   };
-  go.onclick = submit; pw.onkeydown = e => { if (e.key === 'Enter') submit(); };
-  $('#forgot').onclick = () => { clearInterval(_lockTimer); showRecoveryEntry(); };
+  pad = mountPad(el, { fixed: H.pinLen, onDone: submit });
+  refresh(); _lockTimer = setInterval(refresh, 1000);
   if ($('#bio')) $('#bio').onclick = async () => {
     const p = await Native.bioGet(); if (!p) return;
     const r = await Auth.unlock(p); if (r.ok) { clearInterval(_lockTimer); afterUnlock(); } else { await Native.bioClear(); H.bio = false; await saveHeader(); showLock(); }
   };
-  if (!Auth.lockInfo().recOnly && !pw.disabled) pw.focus();
   if (bioOk && !UI.noAutoBio) { UI.noAutoBio = true; setTimeout(() => $('#bio') && $('#bio').click(), 300); }
 }
 function showSetup() {
   const el = appEl();
-  el.innerHTML = `<div class="lockscr"><div class="lockbox">${langRow()}
-    <div style="display:flex;justify-content:center">${logoSvg(80)}</div>
-    <h1>${t('setup_title')}</h1><div class="sub">${t('setup_sub')}</div>
-    <input id="p1" type="password" placeholder="${esc(t('setup_pw'))}" autocomplete="new-password">
-    <input id="p2" type="password" placeholder="${esc(t('setup_pw2'))}" autocomplete="new-password">
-    <div class="msg" id="msg"></div>
-    <button class="bgold" id="go">${t('setup_btn')}</button></div></div>`;
-  bindLangRow(el, showSetup);
-  $('#go').onclick = async () => {
-    const a = $('#p1').value, b = $('#p2').value, msg = $('#msg');
-    if (a.length < 6) { msg.textContent = t('setup_err_short'); return; }
-    if (a !== b) { msg.textContent = t('setup_err_match'); return; }
-    $('#go').disabled = true;
-    const code = await Auth.setup(a);
-    showRecoveryCode(code, () => afterUnlock());
+  let first = null; // step 1 PIN, step 2 confirmation
+  const draw = () => {
+    el.innerHTML = `<div class="lockscr"><div class="lockbox pinbox">${langRow()}
+      <div style="display:flex;justify-content:center">${logoSvg(64)}</div>
+      <h1>${t('setup_title')}</h1><div class="sub">${first ? t('setup_pw2') : t('setup_sub')}</div>
+      ${padHtml()}
+      <div class="msg" id="msg"></div>
+      <button class="bgold" id="go" disabled>${first ? t('ok') : t('setup_btn')}</button>
+      <button class="lnk" id="skip">${first ? t('btn_cancel') : t('setup_skip')}</button></div></div>`;
+    bindLangRow(el, () => { first = null; draw(); });
+    const msg = $('#msg'), go = $('#go');
+    const pad = mountPad(el, {
+      fixed: first ? first.length : 0, max: 6,
+      onChange: v => { go.disabled = !first && v.length < 4 || (first && v.length !== first.length); msg.textContent = ''; },
+      onDone: v => next(v),
+    });
+    const next = async v => {
+      if (!first) { if (!PIN_RE.test(v)) { msg.textContent = t('setup_err_short'); return; } first = v; draw(); return; }
+      if (v !== first) { msg.textContent = t('setup_err_match'); pad.shake(); setTimeout(() => pad.clear(), 380); return; }
+      pad.disable(true); go.disabled = true; await Auth.setup(v); afterUnlock();
+    };
+    go.onclick = () => next(pad.get());
+    $('#skip').onclick = async () => {
+      if (first) { first = null; draw(); return; }
+      $('#skip').disabled = true; await Auth.setup(null); afterUnlock();
+    };
   };
-  $('#p1').focus();
-}
-function showRecoveryCode(code, next) {
-  appEl().innerHTML = `<div class="lockscr"><div class="lockbox">
-    <h1>${t('rec_title')}</h1><div class="codebox" id="code">${esc(code)}</div>
-    <div class="note">${t('rec_text')}</div>
-    <label class="ck"><input type="checkbox" id="ck"> ${t('rec_saved')}</label>
-    <button class="bgold" id="go" disabled>${t('rec_done')}</button></div></div>`;
-  $('#ck').onchange = e => { $('#go').disabled = !e.target.checked; };
-  $('#go').onclick = next;
-}
-function showRecoveryEntry() {
-  appEl().innerHTML = `<div class="lockscr"><div class="lockbox">${langRow()}
-    <h1>${t('rec_title')}</h1><div class="sub">${t('rec_enter')}</div>
-    <input id="rc" placeholder="XXXX-XXXX-XXXX-XXXX" autocomplete="off" autocapitalize="characters" spellcheck="false">
-    <div class="sub" style="margin:4px 0 0">${t('rec_new_pw')}</div>
-    <input id="p1" type="password" placeholder="${esc(t('setup_pw'))}" autocomplete="new-password">
-    <input id="p2" type="password" placeholder="${esc(t('setup_pw2'))}" autocomplete="new-password">
-    <div class="msg" id="msg"></div>
-    <button class="bgold" id="go">${t('rec_btn')}</button>
-    <button class="lnk" id="back">${t('lock_back')}</button></div></div>`;
-  bindLangRow(appEl(), showRecoveryEntry);
-  $('#back').onclick = showLock;
-  $('#go').onclick = async () => {
-    const msg = $('#msg'), a = $('#p1').value, b = $('#p2').value;
-    if (a.length < 6) { msg.textContent = t('setup_err_short'); return; }
-    if (a !== b) { msg.textContent = t('setup_err_match'); return; }
-    $('#go').disabled = true;
-    const r = await Auth.unlockRecovery($('#rc').value, a);
-    if (r.ok) { if (H.bio) { await Native.bioClear(); H.bio = false; await saveHeader(); } showRecoveryCode(r.newCode, () => afterUnlock()); return; }
-    msg.textContent = r.wait > 0 ? t('lock_wait', { t: fmtWait(r.wait) }) : t('rec_wrong'); $('#go').disabled = false;
-  };
+  draw();
 }
 
 // ---------- shell ----------
@@ -214,13 +261,13 @@ function mountShell() {
       ${NAV.map(([k, lab, ic]) => `<button class="nav" data-r="${k}">${IC[ic]}<span>${t(lab)}</span></button>`).join('')}
       <div class="sp"></div>
       <div class="lg">${['tk', 'ru', 'en'].map(l => `<button data-l="${l}" class="${H.lang === l ? 'on' : ''}">${l.toUpperCase()}</button>`).join('')}</div>
-      <button class="nav" id="navlock">${IC.lock(20)}<span>${t('nav_lock')}</span></button>
+      ${Auth.hasPin() ? `<button class="nav" id="navlock">${IC.lock(20)}<span>${t('nav_lock')}</span></button>` : ''}
     </aside>
     <section class="main" id="main"></section>
     <div id="cardhost"></div></div>`;
   $$('.side .nav[data-r]').forEach(b => b.onclick = () => goRoute(b.dataset.r));
   $$('.side .lg button').forEach(b => b.onclick = () => setLang(b.dataset.l));
-  $('#navlock').onclick = () => doLock();
+  if ($('#navlock')) $('#navlock').onclick = () => doLock();
   renderRoute();
 }
 async function setLang(l) {
@@ -231,15 +278,16 @@ async function setLang(l) {
   mountShell(); UI.layers = layers; if (route !== 'books') { UI.route = route; renderRoute(); }
   if (draft) openCard(draft.isNew ? null : draft.uuid, draft.vals, true);
 }
+function animRoute() { const m = $('#main'); if (!m) return; m.classList.remove('routein'); void m.offsetWidth; m.classList.add('routein'); }
 function goRoute(r) {
   if (r === UI.route) return;
-  if (r === 'books') { if (UI.routeLayer) { const l = UI.routeLayer; UI.routeLayer = null; dropLayer(l); } UI.route = 'books'; renderRoute(); return; }
+  if (r === 'books') { if (UI.routeLayer) { const l = UI.routeLayer; UI.routeLayer = null; dropLayer(l); } UI.route = 'books'; renderRoute(); animRoute(); return; }
   if (UI.card) closeCard(false).then(ok => { if (ok) goRoute(r); });
   else {
     if (!UI.routeLayer) {
       UI.routeLayer = pushLayer({ onBack: () => { UI.route = 'books'; UI.routeLayer = null; renderRoute(); return true; } });
     }
-    UI.route = r; renderRoute();
+    UI.route = r; renderRoute(); animRoute();
   }
 }
 function renderRoute() {
@@ -262,7 +310,7 @@ function bindMobBar() {
 async function openMenu() {
   const items = [['trash', 'nav_trash'], ['columns', 'nav_columns'], ['ie', 'nav_import'], ['sync', 'nav_sync'], ['settings', 'nav_settings']];
   const html = items.map(([k, lab]) => `<button class="setrow" data-go="${k}"><span class="tt">${t(lab)}</span><span class="chev">${IC.chev}</span></button>`).join('') +
-    `<button class="setrow" data-go="__sel"><span class="tt">${t('menu_select')}</span></button><button class="setrow" data-go="__lock"><span class="tt">${t('nav_lock')}</span></button>`;
+    `<button class="setrow" data-go="__sel"><span class="tt">${t('menu_select')}</span></button>${Auth.hasPin() ? `<button class="setrow" data-go="__lock"><span class="tt">${t('nav_lock')}</span></button>` : ''}`;
   const p = ask({ html: `<div class="group" style="margin:0">${html}</div>`, buttons: [{ label: t('close'), v: null, cls: 'b2' }] });
   setTimeout(() => $$('.mb [data-go]').forEach(b => b.onclick = () => {
     const mb = b.closest('.mb'); const k = b.dataset.go; mb.querySelector('.btn').click();
@@ -275,11 +323,13 @@ async function openMenu() {
 function tableCols() {
   const vis = visibleCols();
   if (isWide()) return vis;
-  const pick = vis.filter(c => ['id', 'inv', 'title', 'scanned'].includes(c.key));
-  return pick;
+  return vis.filter(c => c.kind === 'id' || c.key === 'inv' || onPhone(c));
 }
 function colWidth(c) {
-  if (!isWide()) { switch (c.key) { case 'id': return '34px'; case 'inv': return '86px'; case 'title': return 'minmax(0,1fr)'; case 'scanned': return '44px'; } return 'minmax(60px,1fr)'; }
+  if (!isWide()) {
+    switch (c.key) { case 'id': return '34px'; case 'inv': return '86px'; case 'title': return 'minmax(190px,1fr)'; case 'scanned': return '48px'; case 'pages': return '56px'; case 'date': return '90px'; case 'type': return '96px'; case 'author': return 'minmax(140px,1fr)'; case 'lang': return 'minmax(90px,1fr)'; case 'loc': return 'minmax(110px,1fr)'; }
+    return c.kind === 'check' ? '56px' : c.kind === 'number' ? '72px' : 'minmax(110px,1fr)';
+  }
   switch (c.key) {
     case 'id': return '46px'; case 'inv': return '104px'; case 'title': return 'minmax(120px,2fr)';
     case 'author': return 'minmax(90px,1.3fr)'; case 'scanned': return '56px'; case 'pages': return '66px';
@@ -288,6 +338,15 @@ function colWidth(c) {
   return c.kind === 'check' ? '56px' : c.kind === 'number' ? '80px' : 'minmax(80px,1fr)';
 }
 function gridTpl(cols) { return (isWide() || UI.selMode ? '24px ' : '') + cols.map(colWidth).join(' '); }
+// sticky (frozen) left columns: checkbox, ID, inventory number
+function stickyLefts(cols) {
+  const pad = isWide() ? 14 : 12, gap = isWide() ? 10 : 8, wId = isWide() ? 46 : 34, wInv = isWide() ? 104 : 86;
+  let x = pad; const o = {};
+  if (isWide() || UI.selMode) { o.cb = x; o.first = 'cb'; x += 24 + gap; }
+  if (cols[0] && cols[0].kind === 'id') { o.id = x; if (!o.first) o.first = 'id'; x += wId + gap; if (cols[1] && cols[1].key === 'inv') { o.inv = x; o.last = 'inv'; } else o.last = 'id'; }
+  return o;
+}
+const stk = (o, k) => o[k] !== undefined ? ` stk${o.first === k ? ' stkf' : ''}${o.last === k ? ' stkl' : ''}" style="left:${o[k]}px` : '';
 function computeList() {
   const key = `${DB.rev}|${UI.q}|${UI.filter}`;
   if (UI.listKey === key) return UI.list;
@@ -331,12 +390,13 @@ function renderChips() {
 }
 function rowHtml(r, cols, tpl) {
   const sel = UI.sel.has(r.uuid);
-  const cb = (isWide() || UI.selMode) ? `<span class="cb ${sel ? 'on' : ''}" data-cb="1">${sel ? IC.ok(14, '#fff') : ''}</span>` : '';
+  const SL = stickyLefts(cols);
+  const cb = (isWide() || UI.selMode) ? `<span class="cb ${sel ? 'on' : ''}${stk(SL, 'cb')}" data-cb="1">${sel ? IC.ok(14, '#fff') : ''}</span>` : '';
   const cells = cols.map(c => {
-    if (c.kind === 'id') return `<span class="idc">${r.id}</span>`;
+    if (c.kind === 'id') return `<span class="idc${stk(SL, 'id')}">${r.id}</span>`;
     if (c.kind === 'check') return `<span class="mid">${r[c.key] ? IC.ok(20) : IC.no(20)}</span>`;
     if (c.kind === 'number') return `<span class="num">${esc(cellText(c, r))}</span>`;
-    return `<span class="${c.key === 'inv' ? 'inv' : ''}">${esc(cellText(c, r))}</span>`;
+    return `<span class="${c.key === 'inv' ? 'inv' + stk(SL, 'inv') : ''}">${esc(cellText(c, r))}</span>`;
   }).join('');
   const cur = UI.card && UI.card.uuid === r.uuid ? ' cur' : '';
   return `<div class="tr${sel ? ' sel' : ''}${cur}" data-u="${r.uuid}" style="grid-template-columns:${tpl}">${cb}${cells}</div>`;
@@ -345,7 +405,8 @@ function renderHead(cols, tpl) {
   const th = $('#th'); if (!th) return;
   const showCb = isWide() || UI.selMode;
   th.style.gridTemplateColumns = tpl;
-  th.innerHTML = (showCb ? '<span></span>' : '') + cols.map(c => `<span class="${c.kind === 'number' ? 'num' : c.kind === 'check' ? 'mid' : ''}">${esc(colName(c))}</span>`).join('');
+  const SL = stickyLefts(cols);
+  th.innerHTML = (showCb ? `<span class="${stk(SL, 'cb').slice(1)}"></span>` : '') + cols.map(c => `<span class="${c.kind === 'number' ? 'num' : c.kind === 'check' ? 'mid' : ''}${c.kind === 'id' ? stk(SL, 'id') : c.key === 'inv' ? stk(SL, 'inv') : ''}">${esc(colName(c))}</span>`).join('');
 }
 function refreshList() {
   if (UI.route !== 'books') return;
@@ -596,6 +657,7 @@ async function saveCard(next) {
 }
 
 async function doLock() {
+  if (!Auth.hasPin()) { await flushSave(); return; }
   if (UI.card && cardDirty()) DB.draft = { uuid: UI.card.uuid, isNew: UI.card.isNew, vals: readCard() };
   else DB.draft = null;
   await Auth.lockNow();

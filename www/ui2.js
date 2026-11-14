@@ -32,13 +32,14 @@ function viewColumns(main) {
     const locked = c.kind === 'id';
     return `<div class="colrow ${c.hidden ? 'hid' : ''}" data-k="${c.key}"><span class="nm">${esc(colName(c))}${!c.b ? `<span class="badge">${t('badge_custom')}</span>` : ''}</span>
     ${locked ? `<span class="ib" style="opacity:.6">${IC.lock(18)}</span>` : `<button class="ib" data-a="up" ${i <= 1 ? 'disabled' : ''}>${IC.up}</button><button class="ib" data-a="down" ${i >= cols.length - 1 ? 'disabled' : ''}>${IC.down}</button>
-    <button class="ib" data-a="eye" ${(builtinOf(c.key) || {}).noHide ? 'disabled' : ''}>${c.hidden ? IC.eyeoff : IC.eye}</button><button class="ib" data-a="edit">${IC.edit}</button>${!c.b ? `<button class="ib" data-a="del" style="color:var(--bad)">${IC.trash}</button>` : ''}`}</div>`;
+    <button class="ib ${onPhone(c) ? 'ph on' : 'ph'}" data-a="ph" title="${esc(t('col_phone'))}" ${(c.key === 'inv' || c.hidden) ? 'disabled' : ''}>${IC.phone}</button><button class="ib" data-a="eye" ${(builtinOf(c.key) || {}).noHide ? 'disabled' : ''}>${c.hidden ? IC.eyeoff : IC.eye}</button><button class="ib" data-a="edit">${IC.edit}</button>${!c.b ? `<button class="ib" data-a="del" style="color:var(--bad)">${IC.trash}</button>` : ''}`}</div>`;
   }).join('');
   pageShell(main, t('nav_columns'), `<div class="hint">${t('cols_hint')}</div><div style="padding:0 12px 8px"><button class="sbtn pri" id="addCol">${IC.plus.replace('width="26" height="26"', 'width="18" height="18"')}${t('col_add_btn')}</button></div><div class="group" style="margin:6px 12px">${rows}</div>`);
   $('#addCol').onclick = async () => { if (await colDialog(null)) viewColumns(main); };
   $$('.colrow [data-a]', main).forEach(b => b.onclick = async () => {
     const key = b.closest('.colrow').dataset.k; const c = colDef(key); const a = b.dataset.a;
     if (a === 'up' || a === 'down') { moveColumn(key, a === 'up' ? -1 : 1); }
+    else if (a === 'ph') { c.ph = !onPhone(c); c.mts = Date.now(); colStamp(); scheduleSave(); UI.listKey = ''; }
     else if (a === 'eye') { c.hidden = !c.hidden; c.mts = Date.now(); colStamp(); scheduleSave(); }
     else if (a === 'edit') { await colDialog(c); }
     else if (a === 'del') {
@@ -85,6 +86,7 @@ async function colDialog(def) {
 
 // ---------- settings ----------
 async function viewSettings(main) {
+  const hasPin = Auth.hasPin();
   const bioOk = Native.isApp && await Native.bioAvailable();
   const sc = main.querySelector('.page') ? main.querySelector('.page').scrollTop : 0;
   const alOpts = [[0, t('al_now')], [60, t('al_1')], [300, t('al_5')], [900, t('al_15')], [-1, t('al_never')]];
@@ -92,10 +94,11 @@ async function viewSettings(main) {
   const bk = H.lastBackup ? t('set_backup_last', { d: fmtDateTime(H.lastBackup) }) : t('backup_never');
   pageShell(main, t('set_title'), `
   <div class="group"><div class="setrow col"><div class="tt">${t('set_lang')}</div>${segHtml('sLang', [['tk', 'Türkmençe'], ['ru', 'Русский'], ['en', 'English']], H.lang).replace('margin:8px 14px', '')}</div>
-  ${rowSwitch('sEnc', t('set_encrypt'), t('set_encrypt_sub'), H.enc)}${rowLink('sPw', t('set_password'))}${rowLink('sRec', t('set_recovery'))}</div>
-  <div class="group"><div class="setrow col"><div class="tt">${t('set_autolock')}</div><select class="inp" id="sAl">${alOpts.map(([v, l]) => `<option value="${v}" ${H.autolock === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
+  ${rowSwitch('sEnc', t('set_encrypt'), t('set_encrypt_sub'), hasPin)}${hasPin ? rowLink('sPw', t('set_password')) : ''}</div>
+  ${hasPin ? `<div class="group"><div class="setrow col"><div class="tt">${t('set_autolock')}</div><select class="inp" id="sAl">${alOpts.map(([v, l]) => `<option value="${v}" ${H.autolock === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
   ${rowSwitch('sBio', t('set_bio'), bioOk ? t('set_bio_sub') : t('set_bio_na'), H.bio && bioOk, !bioOk)}
-  ${rowSwitch('sShot', t('set_shot'), Native.canBlockShots() ? t('set_shot_sub') : t('set_shot_na'), H.shot)}</div>
+  </div>`: ''}
+  <div class="group">${rowSwitch('sShot', t('set_shot'), Native.canBlockShots() ? t('set_shot_sub') : t('set_shot_na'), H.shot)}</div>
   <div class="group"><div class="setrow col"><div class="tt">${t('set_theme')}</div>${segHtml('sTheme', [['light', t('theme_light')], ['dark', t('theme_dark')]], H.theme)}</div>
   <div class="setrow col"><div class="tt">${t('set_font')}</div>${segHtml('sFont', [['s', t('font_s')], ['m', t('font_m')], ['l', t('font_l')]], H.font)}</div></div>
   <div class="group">${rowLink('sCols', t('set_columns'))}${rowLink('sTrash', t('set_trash'), trashN ? `${trashN}` : '')}
@@ -106,38 +109,27 @@ async function viewSettings(main) {
   $$('#sLang button', main).forEach(b => b.onclick = async () => { await setLang(b.dataset.v); });
   $$('#sTheme button', main).forEach(b => b.onclick = async () => { H.theme = b.dataset.v; applyPrefs(); await saveHeader(); again(); });
   $$('#sFont button', main).forEach(b => b.onclick = async () => { H.font = b.dataset.v; applyPrefs(); await saveHeader(); again(); });
-  $('#sAl').onchange = async e => { H.autolock = +e.target.value; await saveHeader(); };
+  if ($('#sAl')) $('#sAl').onchange = async e => { H.autolock = +e.target.value; await saveHeader(); };
   $('#sEnc').onclick = async () => {
-    if (H.enc) { if (await askPassword(t('enc_off_warn'))) { await Auth.setEncryption(false); toast(t('enc_off_ok')); } }
-    else { await Auth.setEncryption(true); toast(t('enc_on_ok')); }
+    if (hasPin) {
+      const pw = await askPassword(t('enc_off_warn'));
+      if (pw) { await Native.bioClear(); await Auth.disablePin(); toast(t('enc_off_ok')); }
+    } else {
+      const pin = await askNewPin(t('set_encrypt'));
+      if (pin) { await Auth.enablePin(pin); toast(t('enc_on_ok')); }
+    }
     again();
   };
   $('#sShot').onclick = async () => { H.shot = !H.shot; await saveHeader(); await Native.setShotBlock(H.shot); again(); };
-  $('#sBio').onclick = async () => {
+  if ($('#sBio')) $('#sBio').onclick = async () => {
     if (!bioOk) return;
     if (H.bio) { await Native.bioClear(); H.bio = false; }
     else { const pw = await askPassword(t('set_bio')); if (pw && await Native.bioSave(pw)) H.bio = true; }
     await saveHeader(); again();
   };
-  $('#sPw').onclick = async () => {
-    const ok = await ask({
-      title: t('set_password'), html: `<input class="inp" id="o" type="password" placeholder="${esc(t('pw_cur'))}" autocomplete="off"><input class="inp" id="n1" type="password" placeholder="${esc(t('pw_new'))}" autocomplete="new-password"><input class="inp" id="n2" type="password" placeholder="${esc(t('setup_pw2'))}" autocomplete="new-password">`,
-      buttons: [{ label: t('btn_cancel'), v: false }, {
-        label: t('btn_save'), cls: 'b1',
-        check: async m => {
-          if (!(await Auth.verifyPw($('#o', m).value))) { toast(t('pw_wrong')); return false; }
-          if ($('#n1', m).value.length < 6) { toast(t('setup_err_short')); return false; }
-          if ($('#n1', m).value !== $('#n2', m).value) { toast(t('setup_err_match')); return false; } return true;
-        },
-        v: m => $('#n1', m).value
-      }],
-    });
-    if (ok) { await Auth.changePw(ok); if (H.bio) await Native.bioSave(ok); toast(t('pw_ok')); }
-  };
-  $('#sRec').onclick = async () => {
-    const pw = await askPassword(t('rec_regen_note')); if (!pw) return;
-    const code = await Auth.newRecovery();
-    await ask({ title: t('rec_title'), html: `<div class="codebox">${esc(code)}</div><p>${esc(t('rec_text'))}</p>`, buttons: [{ label: t('rec_done'), v: true, cls: 'b1' }], dismiss: false });
+  if ($('#sPw')) $('#sPw').onclick = async () => {
+    const pin = await askNewPin(t('set_password'), true);
+    if (pin) { await Auth.changePw(pin); if (H.bio) await Native.bioSave(pin); toast(t('pw_ok')); }
   };
   $('#sCols').onclick = () => goRoute('columns'); $('#sTrash').onclick = () => goRoute('trash');
   $('#sBk').onclick = async () => { const n = await createBackup(); toast(t('backup_done', { f: n })); again(); };
@@ -177,9 +169,10 @@ async function readFilePayload(text, kind) {
 async function startImport() {
   const f = await pickFile('.xlsx,.xls,.csv'); if (!f) return;
   let plan;
-  try { plan = buildImportPlan(parseWorkbook(await readBuf(f)), f.name); } catch (e) { console.error(e); toast(t('file_err')); return; }
-  if (plan.empty) { toast(t('imp_empty')); return; }
-  UI.imp = { plan }; recomputeImport();
+  try {
+    plan = await withBusy(t('imp_progress'), async () => { const p = buildImportPlan(parseWorkbook(await readBuf(f)), f.name); if (!p.empty) { UI.imp = { plan: p }; recomputeImport(); } return p; });
+  } catch (e) { console.error(e); UI.imp = null; toast(t('file_err')); return; }
+  if (plan.empty) { UI.imp = null; toast(t('imp_empty')); return; }
   if (UI.route === 'import') renderRoute(); else goRoute('import');
 }
 function recomputeImport() {
@@ -227,13 +220,13 @@ function viewImport(main) {
     const c = p.cols[+s.dataset.i]; const v = s.value;
     if (c.target === 'new') { if (v) { c.kind = v; c.chosen = true; } }
     else if (v === 'ignore') { c.target0 = c.target; c.target = 'ignore'; }
-    recomputeImport(); viewImport(main);
+    withBusy(t('imp_progress'), async () => recomputeImport()).then(() => viewImport(main));
   });
   $$('.acts button[data-a]', main).forEach(b => b.onclick = () => { I.dups[+b.dataset.k].act = b.dataset.a; viewImport(main); });
   $$('.acts button[data-all]', main).forEach(b => b.onclick = () => { I.dups.forEach(d => { if (b.dataset.all !== 'update' || d.kind !== 'file') d.act = b.dataset.all; }); viewImport(main); });
   const dx = $('#dupX'); if (dx) dx.onclick = () => exportDupsXlsx(p, I.rv, I.dups);
   $('#load').onclick = async () => {
-    const st = applyImport(p, I.rv, I.dups); await flushSave(); UI.imp = null; UI.listKey = '';
+    const st = await withBusy(t('imp_progress'), async () => { const x = applyImport(p, I.rv, I.dups); await flushSave(); return x; }); UI.imp = null; UI.listKey = '';
     toast(t('imp_result', { a: st.added, u: st.updated, s: st.skipped }), 4000);
     goRoute('books'); refreshList();
   };
