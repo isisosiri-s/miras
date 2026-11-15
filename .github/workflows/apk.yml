@@ -28,6 +28,8 @@ jobs:
             echo "WARNING: secret ANDROID_KEYSTORE_B64 not found - random key will be used"
           fi
       - run: |
+          sed -i "s/const APP_VERSION = '[^']*'/const APP_VERSION = '1.1.${{ github.run_number }}'/" www/core.js
+          grep -n "const APP_VERSION" www/core.js
           npm install --no-audit --no-fund
           npx cap add android
           node android-patch/patch.js
