@@ -1,6 +1,7 @@
 name: Build APK
 on:
   push:
+    paths-ignore: ['electron/**', '.github/workflows/apk.yml']  # PC-only changes do not need a new APK
   workflow_dispatch:
     inputs:
       version:
