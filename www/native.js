@@ -45,10 +45,13 @@ const Native = {
       b = (getComputedStyle(document.documentElement).getPropertyValue('--bg') || '').trim() || '#F6F1E9';
     }
     const k = t + b; if (k === this._barKey) return; this._barKey = k;
-    // page is drawn edge-to-edge under the bars: paint the safe-area strips with the screen colours
-    const st = 'max(var(--safe-area-inset-top,0px),env(safe-area-inset-top,0px))';
-    document.documentElement.style.background = `linear-gradient(to bottom, ${t} 0, ${t} ${st}, ${b} ${st}, ${b} 100%)`;
-    document.body.style.background = 'transparent';
+    // PIN / splash screens only: paint the safe-area strips under the system bars with the screen colour
+    const lock = !!document.querySelector('.lockscr, #splash:not(.out)');
+    if (lock) {
+      const st = 'max(var(--safe-area-inset-top,0px),env(safe-area-inset-top,0px))';
+      document.documentElement.style.background = `linear-gradient(to bottom, ${t} 0, ${t} ${st}, ${b} ${st}, ${b} 100%)`;
+      document.body.style.background = 'transparent';
+    } else { document.documentElement.style.background = ''; document.body.style.background = ''; }
     if (!this.cap) return;
     try { const P = this.plugin('MirasBars') || this.cap.registerPlugin('MirasBars'); P.set({ top: t, bottom: b }).catch(e => { this._barKey = null; console.warn('pb', e); }); } catch (e) { this._barKey = null; console.warn('pb', e); }
   },
