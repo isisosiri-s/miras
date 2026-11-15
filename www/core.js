@@ -1,6 +1,6 @@
 'use strict';
 /* Miras core: i18n, utils, crypto, storage, data model */
-const APP_VERSION = '1.1.25';
+const APP_VERSION = '1.1.27';
 const PBKDF_ITER = 250000;
 const TRASH_DAYS = 30;
 
@@ -179,7 +179,7 @@ const H = { // header: not encrypted
   deviceId: '', pw: null, rec: null, lock: { fails: 0, until: 0 }, lastBackup: 0, setupDone: false,
 };
 const DB = { // data: only in memory while unlocked
-  records: [], columns: defaultColumns(), colsTs: 0, draft: null, rev: 0, reports: [],
+  records: [], columns: defaultColumns(), colsTs: 0, draft: null, rev: 0, reports: [], repTomb: {}, repOrd: 0,
   _dk: null, _rawDK: null, _pw: null, _byUuid: null, _invMap: null, _invRev: -1, unlocked: false,
 };
 
@@ -206,7 +206,7 @@ async function loadHeader() {
 // ---------- persistence of data ----------
 let _saveTimer = null, _saving = Promise.resolve();
 function persistObj() {
-  return { v: 1, records: DB.records, columns: DB.columns, colsTs: DB.colsTs, draft: DB.draft, reports: DB.reports };
+  return { v: 1, records: DB.records, columns: DB.columns, colsTs: DB.colsTs, draft: DB.draft, reports: DB.reports, repTomb: DB.repTomb, repOrd: DB.repOrd };
 }
 async function writeData() {
   if (!DB.unlocked) return;
@@ -227,6 +227,7 @@ async function flushSave() {
 function loadDataObj(o) {
   DB.records = o.records || []; DB.columns = o.columns || defaultColumns();
   DB.colsTs = o.colsTs || 0; DB.draft = o.draft || null; DB.reports = Array.isArray(o.reports) ? o.reports : [];
+  DB.repTomb = o.repTomb && typeof o.repTomb === 'object' ? o.repTomb : {}; DB.repOrd = o.repOrd || 0;
   // drop the stray 'note' column that 1.1.14 added
   DB.columns = DB.columns.filter(c => !(c.key === 'note' && c.b && !BUILTIN_KEYS.has('note')));
   // ensure built-ins present
@@ -242,7 +243,7 @@ const Auth = {
   hasPin() { return !!H.pw; },
   async setup(pin) {
     H.setupDone = true; H.lock = { fails: 0, until: 0 }; delete H.rec;
-    DB.records = []; DB.columns = defaultColumns(); DB.colsTs = 0; DB.draft = null; DB.reports = []; DB.unlocked = true;
+    DB.records = []; DB.columns = defaultColumns(); DB.colsTs = 0; DB.draft = null; DB.reports = []; DB.repTomb = {}; DB.repOrd = 0; DB.unlocked = true;
     if (pin) {
       const raw = crypto.getRandomValues(new Uint8Array(32));
       H.pw = await wrapRaw(pin, raw); H.enc = true; H.pinLen = pin.length;
@@ -296,7 +297,7 @@ const Auth = {
   async lockNow() {
     clearTimeout(_saveTimer);
     await flushSave();
-    DB.records = []; DB.columns = defaultColumns(); DB.draft = null; DB.reports = []; DB._dk = null; DB._rawDK = null; DB._pw = null;
+    DB.records = []; DB.columns = defaultColumns(); DB.draft = null; DB.reports = []; DB.repTomb = {}; DB.repOrd = 0; DB._dk = null; DB._rawDK = null; DB._pw = null;
     DB._byUuid = null; DB._invMap = null; DB.unlocked = false;
   },
 };
@@ -339,16 +340,22 @@ function findByName(title, author, exceptUuid) {
 function newRecord(vals, created, forcedId) {
   const r = { uuid: uuid(), id: forcedId || maxId() + 1, created: created || Date.now(), del: 0, vv: {}, ts: 0 };
   for (const k of FIELD_KEYS) r[k] = (k === 'scanned' || k === 'restored') ? false : '';
-  Object.assign(r, vals); touch(r);
+  Object.assign(r, vals); stampFields(r, vals, true); touch(r);
   DB.records.push(r); if (DB._byUuid) DB._byUuid.set(r.uuid, r);
   scheduleSave(); return r;
 }
+// per-field change times (fts) let a sync merge two devices' edits field by field
+const fv = v => (v === undefined || v === null || v === false ? '' : String(v));
+function stampFields(r, vals, force) {
+  const now = Date.now(); r.fts = r.fts || {};
+  for (const k of Object.keys(vals)) if (force || fv(r[k]) !== fv(vals[k])) r.fts[k] = Math.max(now, (r.fts[k] || 0) + 1);
+}
 function updateRecord(r, vals) {
-  Object.assign(r, vals); touch(r); scheduleSave();
+  stampFields(r, vals, false); Object.assign(r, vals); touch(r); scheduleSave();
 }
 function trashRecords(rs) { const now = Date.now(); for (const r of rs) { r.del = now; touch(r); } scheduleSave(); }
 function restoreRecords(rs) { for (const r of rs) { r.del = 0; touch(r); } scheduleSave(); }
-const PURGE_KEEP = ['uuid', 'id', 'created', 'del', 'vv', 'ts', 'purged'];
+const PURGE_KEEP = ['uuid', 'id', 'created', 'del', 'vv', 'ts', 'purged', 'fts'];
 function purgeRecords(rs) {
   for (const r of rs) {
     for (const k of Object.keys(r)) if (!PURGE_KEEP.includes(k)) delete r[k];

@@ -79,7 +79,7 @@ async function exportColumnXlsx(colKey) {
 
 // ---------- backup ----------
 function backupPayload() {
-  return { kind: 'backup', created: Date.now(), device: { id: H.deviceId, kind: deviceKind() }, columns: DB.columns, colsTs: DB.colsTs, records: DB.records, reports: DB.reports };
+  return { kind: 'backup', created: Date.now(), device: { id: H.deviceId, kind: deviceKind() }, columns: DB.columns, colsTs: DB.colsTs, records: DB.records, reports: DB.reports, repTomb: DB.repTomb, repOrd: DB.repOrd };
 }
 async function createBackup() {
   const text = await sealFile(backupPayload(), DB._pw, H.enc);
@@ -90,7 +90,7 @@ async function createBackup() {
 }
 async function restoreBackup(payload) {
   if (!payload || payload.kind !== 'backup') throw new Error('format');
-  loadDataObj({ records: payload.records, columns: payload.columns, colsTs: payload.colsTs, draft: null, reports: payload.reports });
+  loadDataObj({ records: payload.records, columns: payload.columns, colsTs: payload.colsTs, draft: null, reports: payload.reports, repTomb: payload.repTomb, repOrd: payload.repOrd });
   DB.columns = DB.columns; scheduleSave(); await flushSave();
   return liveRecords().length;
 }
@@ -281,7 +281,7 @@ async function exportDupsXlsx(plan, rv, dups) {
 
 // ---------- sync ----------
 function syncPayload() {
-  return { kind: 'sync', created: Date.now(), device: { id: H.deviceId, kind: deviceKind() }, columns: DB.columns, colsTs: DB.colsTs, records: DB.records };
+  return { kind: 'sync', created: Date.now(), device: { id: H.deviceId, kind: deviceKind() }, columns: DB.columns, colsTs: DB.colsTs, records: DB.records, reports: DB.reports, repTomb: DB.repTomb, repOrd: DB.repOrd };
 }
 async function createSyncFile() {
   const name = `miras-sync-${deviceKind()}-${fileStamp()}.json`;
@@ -306,9 +306,163 @@ function showVal(c, v) {
   if (c.kind === 'number') return typeof v === 'number' ? fmtNum(v) : String(v);
   return String(v);
 }
+
+// ---------- merge: records field by field, reports row by row ----------
+const REC_META = new Set(['uuid', 'id', 'created', 'vv', 'ts', 'fts', 'del', 'purged']);
+// a field without its own stamp was never edited (0); records from before field stamps fall back to the record time
+const ftsOf = (r, k) => { const f = r.fts && r.fts[k]; if (f) return f; return r.fts && Object.keys(r.fts).length ? 0 : (r.ts || 0); };
+const jclone = o => JSON.parse(JSON.stringify(o));
+// two devices changed the same record: every field takes the newer value (ties are broken the same way on both sides)
+function mergeRecord(lr, rr) {
+  if (rr.purged) return jclone(rr);
+  if (lr.purged) return jclone(lr);
+  const out = jclone(lr); out.fts = { ...(lr.fts || {}) };
+  for (const k of new Set([...Object.keys(lr), ...Object.keys(rr)])) {
+    if (REC_META.has(k) || k[0] === '_') continue;
+    const x = valOf(lr, k), y = valOf(rr, k), tx = ftsOf(lr, k), ty = ftsOf(rr, k);
+    if (String(x) !== String(y) && (ty > tx || (ty === tx && String(y) > String(x)))) { if (k in rr) out[k] = jclone(rr[k]); else delete out[k]; }
+    const m = Math.max(lr.fts && lr.fts[k] || 0, rr.fts && rr.fts[k] || 0); if (m) out.fts[k] = m;
+  }
+  const dl = lr.del || 0, dr = rr.del || 0;
+  if (dl && dr) out.del = Math.max(dl, dr);
+  else if (dl) out.del = (rr.ts || 0) > dl ? 0 : dl;
+  else if (dr) out.del = (lr.ts || 0) > dr ? 0 : dr;
+  else out.del = 0;
+  out.vv = vvJoin(lr.vv, rr.vv); out.vv[H.deviceId] = (out.vv[H.deviceId] || 0) + 1; out.ts = Date.now(); out._s = null;
+  return out;
+}
+function canonJson(x) {
+  if (Array.isArray(x)) return '[' + x.map(canonJson).join(',') + ']';
+  if (x && typeof x === 'object') return '{' + Object.keys(x).filter(k => k[0] !== '_').sort().map(k => JSON.stringify(k) + ':' + canonJson(x[k])).join(',') + '}';
+  return JSON.stringify(x === undefined ? null : x);
+}
+function mergeReports(L, R) {
+  const tomb = { ...(L.tomb || {}) }; for (const k in (R.tomb || {})) tomb[k] = Math.max(tomb[k] || 0, R.tomb[k]);
+  const rowTs = r => r.ts || 0;
+  const monthTs = m => Math.max(m.ts || 0, m.ordTs || 0, ...(m.rows || []).map(rowTs));
+  const folderTs = f => Math.max(f.ts || 0, ...(f.months || []).map(monthTs));
+  const dead = (xs, tsOf) => xs.length > 0 && xs.every(x => (tomb[x.id] || 0) > tsOf(x));
+  const tie = (a, b) => canonJson(a) >= canonJson(b);
+  const newer = (a, b) => ((a.ts || 0) !== (b.ts || 0) ? ((a.ts || 0) > (b.ts || 0) ? a : b) : (tie(a, b) ? a : b));
+  const nk = v => String(v == null ? '' : v).trim().toLowerCase();
+  const pairBy = (la, lb, keyFn) => {
+    const pairs = [], used = new Set();
+    for (const x of la) { const y = lb.find(o => o.id === x.id); if (y) { pairs.push([x, y]); used.add(y); } else pairs.push([x, null]); }
+    for (const p of pairs) if (!p[1]) {
+      const k = keyFn(p[0]), y = lb.find(o => !used.has(o) && !la.some(z => z.id === o.id) && keyFn(o) === k);
+      if (y) { p[1] = y; used.add(y); }
+    }
+    for (const y of lb) if (!used.has(y)) pairs.push([null, y]);
+    return pairs;
+  };
+  const cid = (a, b) => (a && b ? (a.id < b.id ? a.id : b.id) : (a || b).id);
+  const orderBy = (a, b, listOf, ordA, ordB) => {
+    if (!a || !b) return null;
+    const ja = listOf(a).join(','), jb = listOf(b).join(',');
+    return ordA !== ordB ? (ordA > ordB ? a : b) : (ja >= jb ? a : b);
+  };
+  const mergeMonth = (a, b) => {
+    const src = [a, b].filter(Boolean); if (dead(src, monthTs)) return null;
+    const ra = new Map(((a && a.rows) || []).map(r => [r.id, r])), rb = new Map(((b && b.rows) || []).map(r => [r.id, r]));
+    const rows = new Map();
+    for (const id of new Set([...ra.keys(), ...rb.keys()])) {
+      const x = ra.get(id), y = rb.get(id), row = x && y ? newer(x, y) : (x || y);
+      if ((tomb[id] || 0) > (row.ts || 0)) continue;
+      rows.set(id, jclone(row));
+    }
+    const first = orderBy(a, b, m => (m.rows || []).map(r => r.id), a && a.ordTs || 0, b && b.ordTs || 0);
+    const ids = []; const seen = new Set();
+    for (const m of (first ? [first, first === a ? b : a] : src)) for (const r of (m.rows || [])) if (rows.has(r.id) && !seen.has(r.id)) { seen.add(r.id); ids.push(r.id); }
+    const base = a && b ? newer(a, b) : src[0];
+    const out = { id: cid(a, b), m: base.m, rows: ids.map(i => rows.get(i)) };
+    const ts = Math.max(...src.map(x => x.ts || 0)), ot = Math.max(...src.map(x => x.ordTs || 0));
+    if (ts) out.ts = ts; if (ot) out.ordTs = ot;
+    return out;
+  };
+  const mergeFolder = (a, b) => {
+    const src = [a, b].filter(Boolean); if (dead(src, folderTs)) return null;
+    const months = pairBy((a && a.months) || [], (b && b.months) || [], m => m.m).map(([x, y]) => mergeMonth(x, y)).filter(Boolean);
+    const base = a && b ? newer(a, b) : src[0];
+    const out = { id: cid(a, b), name: base.name, months };
+    const ts = Math.max(...src.map(x => x.ts || 0)); if (ts) out.ts = ts;
+    return out;
+  };
+  const lf = L.reports || [], rf = R.reports || [], cmap = new Map(), merged = [];
+  for (const [a, b] of pairBy(lf, rf, f => nk(f.name))) {
+    const f = mergeFolder(a, b); if (!f) continue;
+    merged.push(f); if (a) cmap.set(a.id, f.id); if (b) cmap.set(b.id, f.id);
+  }
+  const oL = L.ord || 0, oR = R.ord || 0, canonIds = list => list.map(f => cmap.get(f.id)).filter(Boolean);
+  const first = oL !== oR ? (oL > oR ? lf : rf) : (canonIds(lf).join(',') >= canonIds(rf).join(',') ? lf : rf);
+  const second = first === lf ? rf : lf, byId = new Map(merged.map(f => [f.id, f])), reports = [], seen = new Set();
+  for (const f of [...first, ...second]) { const c = cmap.get(f.id); if (c && byId.has(c) && !seen.has(c)) { seen.add(c); reports.push(byId.get(c)); } }
+  const flat = rs => { const m = new Map(); for (const f of rs) for (const mo of f.months) for (const r of mo.rows) m.set(r.id, canonJson(r)); return m; };
+  const before = flat(lf), after = flat(reports), stat = { added: 0, changed: 0, removed: 0 };
+  for (const [id, j] of after) { if (!before.has(id)) stat.added++; else if (before.get(id) !== j) stat.changed++; }
+  for (const id of before.keys()) if (!after.has(id)) stat.removed++;
+  const ord = Math.max(oL, oR);
+  const changed = canonJson(reports) !== canonJson(lf) || canonJson(tomb) !== canonJson(L.tomb || {}) || ord !== oL;
+  return { reports, tomb, ord, stat, changed };
+}
+// ---------- Wi-Fi sync (phone <-> PC) ----------
+const LAN = { code: '', on: false, urls: [], last: null, bad: 0, reg: false };
+const LAN_PORT = 47653;
+function planStats(plan) {
+  return { added: plan.added.length, changed: plan.changed.length, merged: plan.merged.length, deleted: plan.deleted.length, cols: plan.colChanges, rep: plan.rep ? plan.rep.stat : null };
+}
+function lanRefresh() {
+  UI.listKey = '';
+  if (UI.route === 'books' && typeof refreshList === 'function') refreshList();
+  else if (UI.route === 'reports' && typeof renderRoute === 'function') renderRoute();
+  else if (UI.route === 'sync' && !UI.sync && typeof viewSync === 'function') { const m = $('#main'); if (m) viewSync(m); }
+}
+// PC side: one request from the phone (encrypted with the pairing code)
+async function lanHandle(text) {
+  if (!DB.unlocked) return { status: 423, body: '' };
+  let p; try { p = await openFile(text, LAN.code); } catch (_) { return { status: 403, body: '' }; }
+  if (!p || p.kind !== 'sync' || !Array.isArray(p.records)) return { status: 400, body: '' };
+  const plan = planMerge(p), r = plan.identical ? { renum: 0 } : await applyMerge(plan);
+  LAN.last = { at: Date.now(), renum: r.renum, ...planStats(plan) }; LAN.bad = 0;
+  const body = await sealFile(syncPayload(), LAN.code, true);
+  lanRefresh();
+  return { status: 200, body };
+}
+function lanEvent(ev) {
+  if (ev.type === 'stopped') { LAN.on = false; }
+  else if (ev.type === 'bad') { LAN.bad++; }
+  lanRefresh();
+}
+async function lanStartPc() {
+  if (!window.MirasLan) throw new Error('net');
+  if (!LAN.reg) { MirasLan.onRequest(lanHandle); MirasLan.onEvent(lanEvent); LAN.reg = true; }
+  const r = await MirasLan.start();
+  if (!r || r.error) throw new Error(r && r.error === 'EADDRINUSE' ? 'port' : 'net');
+  LAN.code = r.code; LAN.urls = r.urls; LAN.on = true; LAN.last = null; LAN.bad = 0;
+}
+async function lanStopPc() { if (window.MirasLan) await MirasLan.stop(); LAN.on = false; }
+const lanTimeout = (pr, ms) => Promise.race([pr, new Promise((_, rej) => setTimeout(() => rej(new Error('net')), ms))]);
+// phone side: send our data, get the merged data back, merge it too
+async function lanSyncClient(addr, code) {
+  let base = String(addr || '').trim().replace(/\/+$/, '');
+  if (!base) throw new Error('net');
+  if (!/^https?:\/\//i.test(base)) base = 'http://' + base;
+  if (!/:\d+$/.test(base.replace(/^https?:\/\//i, ''))) base += ':' + LAN_PORT;
+  let hello; try { const r = await lanTimeout(fetch(base + '/hello'), 15000); hello = await r.json(); } catch (_) { throw new Error('net'); }
+  if (!hello || hello.app !== 'miras') throw new Error('net');
+  const body = await sealFile(syncPayload(), code, true);
+  let res; try { res = await lanTimeout(fetch(base + '/sync', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body }), 240000); } catch (_) { throw new Error('net'); }
+  if (res.status === 403) throw new Error('code');
+  if (res.status === 423) throw new Error('locked');
+  if (res.status === 429) throw new Error('wait');
+  if (res.status !== 200) throw new Error('net');
+  let p; try { p = await openFile(await res.text(), code); } catch (_) { throw new Error('code'); }
+  if (!p || p.kind !== 'sync') throw new Error('net');
+  const plan = planMerge(p), r = plan.identical ? { renum: 0 } : await applyMerge(plan);
+  return { plan, renum: r.renum };
+}
 function planMerge(payload) {
   if (!payload || payload.kind !== 'sync') throw new Error('format');
-  const plan = { fromKind: payload.device?.kind, fromCount: payload.records.filter(r => !r.del && !r.purged).length, added: [], changed: [], deleted: [], conflicts: [], ops: [], payload, colChanges: 0 };
+  const plan = { fromKind: payload.device?.kind, fromCount: payload.records.filter(r => !r.del && !r.purged).length, added: [], changed: [], deleted: [], merged: [], conflicts: [], ops: [], payload, colChanges: 0, rep: null };
   const L = byUuid();
   for (const rr of payload.records) {
     const lr = L.get(rr.uuid);
@@ -326,9 +480,12 @@ function planMerge(payload) {
       else if (!rr.del && lr.del) plan.changed.push({ ...item, lines: [t('ch_restored')] });
       else plan.changed.push({ ...item, diffs: diffRecords(lr, rr) });
     } else {
-      const diffs = diffRecords(lr, rr);
-      const delDiff = !!lr.del !== !!rr.del;
-      plan.conflicts.push({ ...item, local: lr, remote: rr, diffs, delDiff, choice: (rr.ts || 0) > (lr.ts || 0) ? 'remote' : 'local' });
+      // changed on both devices: merge field by field
+      const mrec = mergeRecord(lr, rr);
+      plan.ops.push({ type: 'merge', uuid: rr.uuid, rec: mrec });
+      const diffs = diffRecords(lr, mrec), lines = [];
+      if (!!lr.del !== !!mrec.del) lines.push(mrec.del ? t('ch_deleted_here') : t('ch_restored'));
+      plan.merged.push({ ...item, diffs, lines });
     }
   }
   // columns
@@ -339,7 +496,11 @@ function planMerge(payload) {
     else if ((rc.mts || 0) > (lc.mts || 0)) plan.colChanges++;
   }
   if ((payload.colsTs || 0) > DB.colsTs) plan.colChanges = Math.max(plan.colChanges, 1);
-  plan.identical = !plan.ops.length && !plan.conflicts.length && !plan.colChanges;
+  if (Array.isArray(payload.reports)) {
+    plan.rep = mergeReports({ reports: DB.reports, tomb: DB.repTomb, ord: DB.repOrd }, { reports: payload.reports, tomb: payload.repTomb, ord: payload.repOrd });
+    if (!plan.rep.changed) plan.rep = null;
+  }
+  plan.identical = !plan.ops.length && !plan.conflicts.length && !plan.colChanges && !plan.rep;
   return plan;
 }
 function setAllConflicts(plan, mode) {
@@ -377,6 +538,7 @@ async function applyMerge(plan) {
   DB.columns = DB.columns.filter(c => !(c.key === 'note' && c.b && !BUILTIN_KEYS.has('note')));
   for (const c of DB.columns) if (c.del) for (const r of DB.records) delete r[c.key];
   for (const b of BUILTIN_COLS) if (!DB.columns.find(c => c.key === b.key)) DB.columns.push({ key: b.key, b: 1, kind: b.kind, names: null, hidden: false, opts: [], mts: 0 });
+  if (plan.rep) { DB.reports = plan.rep.reports; DB.repTomb = plan.rep.tomb; DB.repOrd = plan.rep.ord; }
   DB._byUuid = null;
   renumberIds();
   let renum = 0; for (const r of DB.records) { const o = localIdsBefore.get(r.uuid); if (o !== undefined && o !== r.id) renum++; }

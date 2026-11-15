@@ -5,6 +5,8 @@ const res = 'android/app/src/main/res';
 const mp = 'android/app/src/main/AndroidManifest.xml';
 let x = fs.readFileSync(mp, 'utf8');
 if (!x.includes('enableOnBackInvokedCallback')) x = x.replace('<application', '<application android:enableOnBackInvokedCallback="true"');
+// Wi-Fi sync talks plain http to the PC on the local network (the data itself is encrypted with the pairing code)
+if (!x.includes('usesCleartextTraffic')) x = x.replace('<application', '<application android:usesCleartextTraffic="true"');
 fs.writeFileSync(mp, x);
 // 2) theme: light (white) status-bar icons — our top bar is dark brown
 const sp = path.join(res, 'values/styles.xml');

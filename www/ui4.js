@@ -7,6 +7,8 @@ const repKindLabel = k => (k === 'book' ? t('rep_k_book') : t('type_' + k));
 const repMonthName = n => t('rep_m' + n);
 const repFolder = id => DB.reports.find(f => f.id === id);
 const repMonthOf = (f, id) => (f ? f.months.find(m => m.id === id) : null);
+// change stamps and delete markers: they let two devices merge reports
+const repTomb = id => { DB.repTomb[id] = Date.now(); };
 const repBadge = k => (k === 'printed' ? 'l' : k === 'book' ? 'b' : '');
 
 function repBack() {
@@ -103,10 +105,10 @@ function repViewFolders(main) {
   const inner = `${hasRows ? `<div class="rp-search"><input class="inp" id="rpGQ" type="search" autocomplete="off" placeholder="${esc(t('rep_gsearch'))}" value="${esc(R.gq || '')}"></div>` : ''}<div id="rpGBody">${hasRows && R.gq ? repHitsHtml(R.gq) : listHtml}</div>`;
   repShell(main, t('nav_reports'), inner, t('rep_new_folder'), async () => {
     const name = await repNameDlg(t('rep_new_folder')); if (!name) return;
-    const f = { id: uuid(), name, months: [] }; DB.reports.push(f); scheduleSave(); repEnter({ f: f.id });
+    const f = { id: uuid(), name, months: [], ts: Date.now() }; DB.reports.push(f); scheduleSave(); repEnter({ f: f.id });
   });
   const body = $('#rpGBody');
-  const bindList = () => { const fl = $('#rpFl'); if (fl) repDrag(fl, '.rp-item', ids => { const by = new Map(DB.reports.map(x => [x.id, x])); const next = ids.map(i => by.get(i)).filter(Boolean); if (next.length === DB.reports.length && next.some((x, i) => x !== DB.reports[i])) { DB.reports = next; scheduleSave(); } }, 'f'); };
+  const bindList = () => { const fl = $('#rpFl'); if (fl) repDrag(fl, '.rp-item', ids => { const by = new Map(DB.reports.map(x => [x.id, x])); const next = ids.map(i => by.get(i)).filter(Boolean); if (next.length === DB.reports.length && next.some((x, i) => x !== DB.reports[i])) { DB.reports = next; DB.repOrd = Date.now(); scheduleSave(); } }, 'f'); };
   bindList();
   const gq = $('#rpGQ');
   if (gq) { let qt; gq.oninput = () => { clearTimeout(qt); qt = setTimeout(() => { R.gq = gq.value.trim(); body.innerHTML = R.gq ? repHitsHtml(R.gq) : listHtml; bindList(); }, 150); }; }
@@ -118,8 +120,8 @@ function repViewFolders(main) {
     if (d) {
       e.stopPropagation(); const f = repFolder(d.dataset.fm); if (!f) return;
       const v = await ask({ title: f.name, buttons: [{ label: t('rep_rename'), v: 'ren', cls: 'b2' }, { label: t('btn_delete'), v: 'del', cls: 'bad' }, { label: t('btn_cancel'), v: null, cls: 'bd' }] });
-      if (v === 'ren') { const nm = await repNameDlg(t('rep_rename'), f.name); if (nm) { f.name = nm; scheduleSave(); renderRoute(); } }
-      else if (v === 'del' && await confirmDlg(t('rep_del_folder', { n: f.name }), t('btn_delete'), true)) { DB.reports = DB.reports.filter(x => x !== f); scheduleSave(); renderRoute(); }
+      if (v === 'ren') { const nm = await repNameDlg(t('rep_rename'), f.name); if (nm) { f.name = nm; f.ts = Date.now(); scheduleSave(); renderRoute(); } }
+      else if (v === 'del' && await confirmDlg(t('rep_del_folder', { n: f.name }), t('btn_delete'), true)) { DB.reports = DB.reports.filter(x => x !== f); repTomb(f.id); scheduleSave(); renderRoute(); }
       return;
     }
     const it = e.target.closest('[data-f]'); if (it) repEnter({ f: it.dataset.f, m: null });
@@ -143,14 +145,14 @@ function repViewMonths(main, f) {
       onMount: (mb, finish) => $$('[data-mo]', mb).forEach(b => b.onclick = () => finish(+b.dataset.mo)),
     });
     if (!n) return;
-    const m = { id: uuid(), m: n, rows: [] }; f.months.push(m); scheduleSave(); repEnter({ m: m.id });
+    const m = { id: uuid(), m: n, rows: [], ts: Date.now() }; f.months.push(m); scheduleSave(); repEnter({ m: m.id });
   }, true);
   $('#pg').onclick = async e => {
     const d = e.target.closest('[data-md]');
     if (d) {
       e.stopPropagation(); const m = repMonthOf(f, d.dataset.md); if (!m) return;
       const nm = `${repMonthName(m.m)} ${f.name}`;
-      if (await confirmDlg(t('rep_del_month', { n: nm }), t('btn_delete'), true)) { f.months = f.months.filter(x => x !== m); scheduleSave(); renderRoute(); }
+      if (await confirmDlg(t('rep_del_month', { n: nm }), t('btn_delete'), true)) { f.months = f.months.filter(x => x !== m); repTomb(m.id); scheduleSave(); renderRoute(); }
       return;
     }
     const it = e.target.closest('[data-m]'); if (it) repEnter({ m: it.dataset.m });
@@ -176,7 +178,7 @@ function repViewMonth(main, f, m) {
     <div class="rp-bar hidden" id="rpSelBar"><button class="btn b2" id="rpSCancel">${esc(t('btn_cancel'))}</button><button class="btn b2" id="rpSAll"></button><button class="btn bad" id="rpSDel"></button></div>`;
   repShell(main, `${f.name} · ${repMonthName(m.m)}`, inner, t('rep_add'), () => repRowDlg(m, null), true);
   $('#rpArc').onclick = () => { UI.rep.pick = { sel: new Set(), q: '' }; renderRoute(); animRoute(); const p = $('.page'); if (p) p.scrollTop = 0; };
-  $('#rpSort').onclick = () => { m.rows = m.rows.map((r, i) => [r, i]).sort((a, b) => REP_KINDS.indexOf(a[0].kind) - REP_KINDS.indexOf(b[0].kind) || a[1] - b[1]).map(x => x[0]); scheduleSave(); repRerender(); };
+  $('#rpSort').onclick = () => { m.rows = m.rows.map((r, i) => [r, i]).sort((a, b) => REP_KINDS.indexOf(a[0].kind) - REP_KINDS.indexOf(b[0].kind) || a[1] - b[1]).map(x => x[0]); m.ordTs = Date.now(); scheduleSave(); repRerender(); };
   const box = $('#rpRows'), bar = $('#rpSelBar');
   // selection mode (in place, so the scroll position stays)
   const syncSel = () => {
@@ -197,7 +199,7 @@ function repViewMonth(main, f, m) {
   $('#rpSDel').onclick = async () => {
     const n = R.sel.size; if (!n) return;
     if (!(await confirmDlg(t('rep_del_rows', { n }), t('btn_delete'), true))) return;
-    const del = R.sel; m.rows = m.rows.filter(r => !del.has(r.id)); R.sel = null; R.selOff = null; scheduleSave(); repRerender();
+    const del = R.sel; del.forEach(repTomb); m.rows = m.rows.filter(r => !del.has(r.id)); R.sel = null; R.selOff = null; scheduleSave(); repRerender();
   };
   let lp = null, swallow = false;
   box.addEventListener('pointerdown', e => {
@@ -219,7 +221,7 @@ function repViewMonth(main, f, m) {
   });
   repDrag(box, '.rp-row', ids => {
     const by = new Map(m.rows.map(r => [r.id, r])), next = ids.map(i => by.get(i)).filter(Boolean);
-    if (next.length === m.rows.length && next.some((r, i) => r !== m.rows[i])) { m.rows = next; scheduleSave(); }
+    if (next.length === m.rows.length && next.some((r, i) => r !== m.rows[i])) { m.rows = next; m.ordTs = Date.now(); scheduleSave(); }
   });
   if (R.hl) {
     const el = $(`.rp-row[data-id="${R.hl}"]`, box); R.hl = null;
@@ -310,7 +312,7 @@ function repRowDlg(m, row) {
   if (row) buttons.push({ label: t('btn_delete'), v: 'del', cls: 'bad' });
   else buttons.push({ label: t('rep_add_more'), cls: 'b3', keep: true, onClick: async mb => {
     const v = await prepare(mb); if (!v) return;
-    m.rows.push({ id: uuid(), ...v }); scheduleSave(); repRerender();
+    m.rows.push({ id: uuid(), ts: Date.now(), ...v }); scheduleSave(); repRerender();
     $('#rpInv', mb).value = ''; $('#rpTitle', mb).value = ''; $('#rpLeaves', mb).value = ''; st.userKind = false; st.userLeaves = false; sync(mb); $('#rpInv', mb).focus();
   } });
   buttons.push({ label: row ? t('rep_save') : t('rep_add_btn'), cls: 'b1', check: async mb => { const v = await prepare(mb); if (!v) return false; mb._v = v; return true; }, v: mb => mb._v });
@@ -324,9 +326,9 @@ function repRowDlg(m, row) {
       sync(mb);
     },
   }).then(async v => {
-    if (v === 'del') { if (await confirmDlg(t('rep_del_row'), t('btn_delete'), true)) { m.rows = m.rows.filter(r => r !== row); scheduleSave(); repRerender(); } return; }
+    if (v === 'del') { if (await confirmDlg(t('rep_del_row'), t('btn_delete'), true)) { m.rows = m.rows.filter(r => r !== row); repTomb(row.id); scheduleSave(); repRerender(); } return; }
     if (!v || typeof v !== 'object') return;
-    if (row) Object.assign(row, v); else m.rows.push({ id: uuid(), ...v });
+    if (row) Object.assign(row, v, { ts: Date.now() }); else m.rows.push({ id: uuid(), ts: Date.now(), ...v });
     scheduleSave(); repRerender();
   });
 }
@@ -376,7 +378,7 @@ async function repPickAdd(m, R) {
       const ok = await ask({ title: t('rep_dup_title', { inv: rec.inv }), text: t('rep_dup_text', { t: rec.title || rec.inv, m: where }), dismiss: false, buttons: [{ label: t('rep_add_anyway'), v: true, cls: 'b1' }, { label: t('rep_skip'), v: false, cls: 'b2' }] });
       if (!ok) { skipped++; continue; }
     }
-    m.rows.push({ id: uuid(), kind: rec.type === 'printed' ? 'printed' : 'manuscript', inv: rec.inv, title: rec.title || '', leaves: rec.pages === '' || rec.pages == null ? '' : repLeavesOf(rec.pages), scanned: false });
+    m.rows.push({ id: uuid(), ts: Date.now(), kind: rec.type === 'printed' ? 'printed' : 'manuscript', inv: rec.inv, title: rec.title || '', leaves: rec.pages === '' || rec.pages == null ? '' : repLeavesOf(rec.pages), scanned: false });
     added++; if (rec.scanned) sc++; else ns++; if (rec.restored) rs++; else nrs++;
   }
   scheduleSave();

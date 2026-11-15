@@ -3,5 +3,5 @@
   "appName": "Miras",
   "webDir": "www",
   "android": { "allowMixedContent": false },
-  "plugins": { "PrivacyScreen": { "enable": true } }
+  "plugins": { "PrivacyScreen": { "enable": true }, "CapacitorHttp": { "enabled": true } }
 }

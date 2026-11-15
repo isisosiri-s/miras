@@ -341,3 +341,11 @@ select.inp{appearance:auto}
 @media(max-width:700px){#rpArc{flex:1 1 100%}}
 .rp-tt{margin:0 0 4px!important;font-weight:600;color:var(--text)!important;font-size:.8rem!important}
 #rpSelBar .btn{padding:0 6px;font-size:.85rem}#rpSelBar .btn:disabled{opacity:.4}
+
+/* 1.1.27 Wi-Fi sync */
+.lan-url{font-weight:700;font-size:1.05rem;word-break:break-all;margin-top:2px}
+.lan-code{font-weight:800;font-size:2rem;letter-spacing:.35em;font-variant-numeric:tabular-nums}
+
+/* 1.1.27 it is an app, not a web page: no text selection, except where typing or copying makes sense */
+html,body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+input,textarea,[contenteditable="true"],.lan-url,.lan-code{-webkit-user-select:text;user-select:text}

@@ -292,10 +292,48 @@ function viewImport(main) {
 }
 
 // ---------- sync ----------
+// ---------- Wi-Fi block ----------
+const lanClientOk = () => !window.MirasLan && (deviceKind() === 'phone' || window.__lanTest);
+function lanStatsHtml(st) {
+  if (!st) return '';
+  const parts = [t('lan_res', { a: st.added, c: st.changed + st.merged, d: st.deleted })];
+  if (st.rep && (st.rep.added || st.rep.changed || st.rep.removed)) parts.push(t('sync_rep', { a: st.rep.added, c: st.rep.changed, r: st.rep.removed }));
+  return `<div class="hint" style="text-align:center">${parts.map(esc).join('<br>')}</div>`;
+}
+function lanBlockHtml() {
+  if (window.MirasLan) {
+    if (!LAN.on) return `<div class="sect">${t('lan_title')}</div><div class="hint">${t('lan_pc_hint')}</div><div style="padding:6px 12px"><button class="btn b1" id="lnStart" style="width:100%">${t('lan_wait_btn')}</button>${LAN.last ? lanStatsHtml(LAN.last) : ''}</div>`;
+    return `<div class="sect">${t('lan_title')}</div><div class="group lan" style="padding:12px">
+      <div class="ss">${t('lan_urls')}</div>${LAN.urls.length ? LAN.urls.map(u => `<div class="lan-url">${esc(u.replace(/^http:\/\//, ''))}</div>`).join('') : `<div class="lan-url">–</div>`}
+      <div class="ss" style="margin-top:8px">${t('lan_code_lbl')}</div><div class="lan-code">${esc(LAN.code)}</div>
+      <div class="ss" style="margin-top:8px">${LAN.last ? t('lan_last', { t: fmtDateTime(LAN.last.at) }) : t('lan_listening')}${LAN.bad ? ` · ${t('lan_bad', { n: LAN.bad })}` : ''}</div>${LAN.last ? lanStatsHtml(LAN.last) : ''}</div>
+      <div style="padding:6px 12px"><button class="btn b2" id="lnStop" style="width:100%">${t('lan_stop')}</button></div>`;
+  }
+  if (!lanClientOk()) return '';
+  return `<div class="sect">${t('lan_title')}</div><div class="hint">${t('lan_phone_hint')}</div><div style="padding:0 12px 6px">
+    <div class="lbl">${t('lan_addr')}</div><input class="inp" id="lnAddr" inputmode="url" autocomplete="off" placeholder="192.168.1.5:${LAN_PORT}" value="${esc(H.lanAddr || '')}">
+    <div class="lbl" style="margin-top:8px">${t('lan_code')}</div><input class="inp" id="lnCode" inputmode="numeric" autocomplete="off" maxlength="6" placeholder="000000">
+    <button class="btn b1" id="lnGo" style="width:100%;margin-top:10px">${t('lan_go')}</button></div>`;
+}
+function bindLan(main) {
+  const st = $('#lnStart'), sp = $('#lnStop'), go = $('#lnGo');
+  const errToast = e => toast(t({ code: 'lan_err_code', locked: 'lan_err_locked', wait: 'lan_err_wait', port: 'lan_err_port' }[e && e.message] || 'lan_err_net'), 4500);
+  if (st) st.onclick = async () => { try { await lanStartPc(); } catch (e) { errToast(e); } viewSync(main); };
+  if (sp) sp.onclick = async () => { await lanStopPc(); viewSync(main); };
+  if (go) go.onclick = async () => {
+    const addr = $('#lnAddr').value.trim(), code = $('#lnCode').value.trim();
+    if (!addr) { $('#lnAddr').focus(); return; }
+    if (!/^\d{6}$/.test(code)) { toast(t('lan_err_code')); $('#lnCode').focus(); return; }
+    H.lanAddr = addr; saveHeader();
+    let r; try { r = await withBusy(t('lan_working'), () => lanSyncClient(addr, code)); } catch (e) { errToast(e); return; }
+    UI.sync = { plan: r.plan, name: 'Wi-Fi', done: true, renum: r.renum, wifi: true }; UI.listKey = ''; viewSync(main);
+  };
+}
 function viewSync(main) {
   const S = UI.sync;
   if (!S) {
-    pageShell(main, t('sync_title'), `<div class="hint">${t('sync_hint')}</div><div style="display:flex;gap:10px;padding:6px 12px"><button class="btn b3" id="syCreate">${t('sync_create')}</button><button class="btn b1" id="syChoose">${t('sync_choose')}</button></div>`);
+    pageShell(main, t('sync_title'), `<div class="hint">${t('sync_hint')}</div><div style="display:flex;gap:10px;padding:6px 12px"><button class="btn b3" id="syCreate">${t('sync_create')}</button><button class="btn b1" id="syChoose">${t('sync_choose')}</button></div>${lanBlockHtml()}`);
+    bindLan(main);
     $('#syCreate').onclick = async () => { const n = await createSyncFile(); toast(t('sync_created', { f: n }), 4000); };
     $('#syChoose').onclick = async () => {
       const f = await pickFile('.json,application/json'); if (!f) return;
@@ -308,9 +346,9 @@ function viewSync(main) {
   }
   const P = S.plan;
   if (S.done) {
-    pageShell(main, t('sync_title'), `<div class="empty"><b>${t('sync_done')}</b>${S.renum ? `<div>${t('sync_renum', { n: S.renum })}</div>` : ''}</div>
-    <div style="display:flex;flex-direction:column;gap:10px;padding:6px 12px"><button class="btn b3" id="syRet">${t('sync_return')}</button><button class="btn b1" id="syBack">${t('nav_books')}</button></div>`);
-    $('#syRet').onclick = async () => { const n = await createSyncFile(); toast(t('sync_created', { f: n }), 4000); };
+    pageShell(main, t('sync_title'), `<div class="empty"><b>${t('sync_done')}</b>${S.renum ? `<div>${t('sync_renum', { n: S.renum })}</div>` : ''}</div>${lanStatsHtml(planStats(P))}
+    <div style="display:flex;flex-direction:column;gap:10px;padding:6px 12px">${S.wifi ? '' : `<button class="btn b3" id="syRet">${t('sync_return')}</button>`}<button class="btn b1" id="syBack">${t('nav_books')}</button></div>`);
+    if (!S.wifi) $('#syRet').onclick = async () => { const n = await createSyncFile(); toast(t('sync_created', { f: n }), 4000); };
     $('#syBack').onclick = () => { UI.sync = null; UI.listKey = ''; goRoute('books'); };
     return;
   }
@@ -321,10 +359,12 @@ function viewSync(main) {
   pageShell(main, t('sync_title'), `
   <div class="group" style="margin-top:10px"><div class="setrow">${IC.file}<div class="tt">${esc(S.name)}<div class="ss">${t('sync_from2', { d: dl(P.fromKind), n: fmtInt(P.fromCount), w: noun('rec', P.fromCount) })}</div></div></div></div>
   <div class="sect">${t('sync_report')}</div>
-  <div class="tiles"><div class="tile a"><b>${P.added.length}</b><span>${t('t_added')}</span></div><div class="tile"><b>${P.changed.length}</b><span>${t('t_changed')}</span></div><div class="tile d"><b>${P.deleted.length}</b><span>${t('t_deleted')}</span></div><div class="tile c"><b>${P.conflicts.length}</b><span>${t('t_conflicts')}</span></div></div>
+  <div class="tiles"><div class="tile a"><b>${P.added.length}</b><span>${t('t_added')}</span></div><div class="tile"><b>${P.changed.length + P.merged.length}</b><span>${t('t_changed')}</span></div><div class="tile d"><b>${P.deleted.length}</b><span>${t('t_deleted')}</span></div></div>
   ${P.colChanges ? `<div class="hint" style="margin-top:0">${t('sync_cols', { n: P.colChanges })}</div>` : ''}
   ${showList(P.added, x => `<div class="rep">${head(x)}<div>${t('ch_new')}</div></div>`)}
   ${showList(P.changed, x => `<div class="rep">${head(x)}${x.lines ? x.lines.map(l => `<div>${esc(l)}</div>`).join('') : diffLines(x.diffs)}</div>`)}
+  ${showList(P.merged, x => `<div class="rep">${head(x)}<div>${t('ch_merged')}</div>${x.diffs.length ? diffLines(x.diffs) : ''}${(x.lines || []).map(l => `<div>${esc(l)}</div>`).join('')}</div>`)}
+  ${P.rep ? `<div class="hint" style="margin-top:0">${t('sync_rep', { a: P.rep.stat.added, c: P.rep.stat.changed, r: P.rep.stat.removed })}</div>` : ''}
   ${showList(P.deleted, x => `<div class="rep">${head(x)}<div style="color:var(--bad)">${t('ch_deleted_here')}</div></div>`)}
   ${P.conflicts.length ? `<div class="sect">${t('t_conflicts')}</div><div style="padding:0 12px 6px;display:flex;gap:8px"><button class="sbtn" id="syNewer">${t('keep_newer')}</button><button class="sbtn" id="syLocal">${t('sync_keep_dev')}</button></div>` : ''}
   ${showList(P.conflicts, (x) => { const k = P.conflicts.indexOf(x); const d0 = x.diffs[0]; const names = x.diffs.map(d => colName(d.c)).join(', ') || t('ch_deleted_here');
