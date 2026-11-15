@@ -326,7 +326,7 @@ function tableCols() {
   return vis.filter(c => c.kind === 'id' || c.key === 'inv' || onPhone(c));
 }
 // ---- column widths (per device, adjustable) ----
-const CW_DEF = { id: [40, 46], inv: [92, 104], title: [240, 320], author: [180, 200], lang: [110, 120], date: [100, 110], type: [110, 120], pages: [76, 80], loc: [170, 190], scanned: [64, 64] };
+const CW_DEF = { id: [40, 46], inv: [92, 104], title: [240, 320], author: [180, 200], lang: [110, 120], date: [100, 110], type: [110, 120], pages: [76, 80], loc: [170, 190], scanned: [64, 64], restored: [72, 72] };
 const CB_W = 36, CW_MIN = 36, CW_MAX = 600;
 const cwMode = () => isWide() ? 'w' : 'p';
 function defW(c) { const d = CW_DEF[c.key]; return d ? d[cwMode() === 'w' ? 1 : 0] : (c.kind === 'check' ? 64 : c.kind === 'number' ? 84 : 170); }
@@ -355,14 +355,24 @@ function stickyLefts(cols) {
   return o;
 }
 const stk = (o, k) => o[k] !== undefined ? ` stk${o.first === k ? ' stkf' : ''}${o.last === k ? ' stkl' : ''}" style="left:var(--l-${k})` : '';
+const cellVal = (c, r) => String(cellText(c, r) ?? '').trim();
+function sortKeyOf(c, r) { if (c.kind === 'id') return r.id; if (c.kind === 'number') { const v = r[c.key]; return v === '' || v == null ? null : (typeof v === 'number' ? v : parseNum(String(v))); } if (c.kind === 'check') return r[c.key] ? 1 : 0; const v = cellVal(c, r); return v ? norm(v).replace(/\d+/g, m => m.padStart(12, '0')) : null; }
 function computeList() {
-  const key = `${DB.rev}|${UI.q}|${UI.filter}`;
+  const cf = UI.colf || {};
+  const key = `${DB.rev}|${UI.q}|${UI.filter}|${UI.sort ? UI.sort.key + UI.sort.dir : ''}|${Object.keys(cf).map(k => k + ':' + cf[k].join('\u0001')).join('|')}`;
   if (UI.listKey === key) return UI.list;
   const toks = norm(UI.q).split(' ').filter(Boolean);
   let l = DB.records.filter(isLive);
   if (UI.filter === 'scanned') l = l.filter(r => r.scanned); else if (UI.filter === 'not') l = l.filter(r => !r.scanned);
+  else if (UI.filter === 'rest') l = l.filter(r => r.restored); else if (UI.filter === 'notrest') l = l.filter(r => !r.restored);
+  else if (UI.filter === 'recent') { const lim = Date.now() - 7 * 86400000; l = l.filter(r => (r.ts || 0) >= lim || (r.created || 0) >= lim); }
   if (toks.length) l = l.filter(r => { const s = searchKey(r); return toks.every(x => s.includes(x)); });
-  l.sort((a, b) => a.id - b.id);
+  for (const k of Object.keys(cf)) { const c = colDef(k); if (!c) continue; const set = new Set(cf[k]); l = l.filter(r => set.has(cellVal(c, r))); }
+  if (UI.sort && colDef(UI.sort.key)) {
+    const c = colDef(UI.sort.key), d = UI.sort.dir;
+    const ks = new Map(l.map(r => [r, sortKeyOf(c, r)]));
+    l.sort((a, b) => { const x = ks.get(a), y = ks.get(b); if (x === null && y === null) return a.id - b.id; if (x === null) return 1; if (y === null) return -1; return (x < y ? -d : x > y ? d : 0) || (a.id - b.id); });
+  } else l.sort((a, b) => a.id - b.id);
   UI.list = l; UI.listKey = key; return l;
 }
 function viewBooks(main) {
@@ -393,8 +403,9 @@ function viewBooks(main) {
 }
 function renderChips() {
   const c = $('#chips'); if (!c) return;
-  c.innerHTML = [['all', t('f_all')], ['scanned', IC.ok(14) + t('f_scanned')], ['not', IC.no(14) + t('f_notscanned')]].map(([k, l]) => `<button class="chip ${UI.filter === k ? 'on' : ''}" data-f="${k}">${l}</button>`).join('');
-  $$('.chip', c).forEach(b => b.onclick = () => { UI.filter = b.dataset.f; renderChips(); refreshList(); const w = $('#tw'); if (w) w.scrollTop = 0; });
+  const rf = H.rest && H.restUi, nf = Object.keys(UI.colf || {}).length;
+  c.innerHTML = [['all', t('f_all')], ['scanned', IC.ok(14) + t('f_scanned')], ['not', IC.no(14) + t('f_notscanned')], ...(rf ? [['rest', IC.ok(14) + t('f_rest')], ['notrest', IC.no(14) + t('f_notrest')]] : []), ['recent', t('f_recent')]].map(([k, l]) => `<button class="chip ${UI.filter === k ? 'on' : ''}" data-f="${k}">${l}</button>`).join('') + (nf ? `<button class="chip clr" data-f="__clr">${IC.no(14)}${t('f_clear_cols', { n: nf })}</button>` : '');
+  $$('.chip', c).forEach(b => b.onclick = () => { if (b.dataset.f === '__clr') UI.colf = {}; else UI.filter = b.dataset.f; renderChips(); refreshList(); const w = $('#tw'); if (w) w.scrollTop = 0; });
 }
 function rowHtml(r, cols, tpl) {
   const sel = UI.sel.has(r.uuid);
@@ -413,7 +424,7 @@ function renderHead(cols, tpl) {
   const th = $('#th'); if (!th) return;
   const showCb = isWide() || UI.selMode;
   const SL = stickyLefts(cols);
-  th.innerHTML = (showCb ? `<span class="${stk(SL, 'cb').slice(1)}"></span>` : '') + cols.map(c => `<span class="${c.kind === 'number' ? 'num' : c.kind === 'check' ? 'mid' : ''}${c.kind === 'id' ? stk(SL, 'id') : c.key === 'inv' ? stk(SL, 'inv') : ''}"><i>${esc(colName(c))}</i><u class="rz" data-k="${c.key}"></u></span>`).join('');
+  th.innerHTML = (showCb ? `<span class="${stk(SL, 'cb').slice(1)}"></span>` : '') + cols.map(c => `<span data-k="${c.key}" class="${c.kind === 'number' ? 'num' : c.kind === 'check' ? 'mid' : ''}${UI.colf && UI.colf[c.key] ? ' flt' : ''}${c.kind === 'id' ? stk(SL, 'id') : c.key === 'inv' ? stk(SL, 'inv') : ''}"><i>${esc(colName(c))}${UI.sort && UI.sort.key === c.key ? (UI.sort.dir > 0 ? ' ▲' : ' ▼') : ''}</i><u class="rz" data-k="${c.key}"></u></span>`).join('');
 }
 function bindResize() {
   const th = $('#th'); if (!th) return;
@@ -426,10 +437,11 @@ function bindResize() {
     const up = () => { h.removeEventListener('pointermove', mv); h.removeEventListener('pointerup', up); h.removeEventListener('pointercancel', up); h.classList.remove('on'); saveHeader(); };
     h.addEventListener('pointermove', mv); h.addEventListener('pointerup', up); h.addEventListener('pointercancel', up);
   });
-  th.addEventListener('click', e => { if (e.target.closest('.rz')) e.stopPropagation(); });
+  th.addEventListener('click', e => { if (e.target.closest('.rz')) { e.stopPropagation(); return; } const sp = e.target.closest('#th>span[data-k]'); if (sp) colMenu(sp.dataset.k); });
 }
 // ---- virtualised list: only the rows near the viewport exist in the DOM (fixed row height) ----
 const VBUF = 10;
+UI.sort = null; UI.colf = {};
 UI.vr = { rh: 66, from: -1, to: -1, cols: null, raf: 0 };
 function rowHeightPx() { return Math.round(parseFloat(getComputedStyle(document.documentElement).fontSize) * 4.1); }
 function renderWindow(force) {
@@ -448,6 +460,63 @@ function onListScroll() {
   const v = UI.vr; if (v.raf) return;
   v.raf = requestAnimationFrame(() => { v.raf = 0; renderWindow(false); });
 }
+
+// ---- column header menu: sort, filter, auto width, hide ----
+function setSort(key, dir) { UI.sort = dir ? { key, dir } : null; refreshList(); }
+function autoFit(c) {
+  const cv = document.createElement('canvas').getContext('2d'); const fs = parseFloat(getComputedStyle(document.documentElement).fontSize) * 0.9;
+  cv.font = `${fs}px Inter, system-ui, sans-serif`; let mx = cv.measureText(colName(c)).width + 24;
+  const recs = UI.list || []; const step = Math.max(1, Math.floor(recs.length / 3000));
+  for (let i = 0; i < recs.length; i += step) { const w = cv.measureText(cellVal(c, recs[i])).width; if (w > mx) mx = w; }
+  setColW(c, Math.min(420, mx + 20)); applyLayout(tableCols()); saveHeader();
+}
+async function colMenu(key) {
+  const c = colDef(key); if (!c) return;
+  const sorted = UI.sort && UI.sort.key === key ? UI.sort.dir : 0, filt = !!(UI.colf && UI.colf[key]);
+  const items = [['asc', t('m_sort_asc'), sorted === 1], ['desc', t('m_sort_desc'), sorted === -1]];
+  if (sorted) items.push(['sort0', t('m_sort_off')]);
+  if (c.kind !== 'id') items.push(['filter', t('m_filter'), filt]); if (filt) items.push(['filter0', t('m_filter_off')]);
+  items.push(['fit', t('m_fit')]);
+  if (c.kind !== 'id' && !(builtinOf(c.key) || {}).noHide) items.push(['hide', t('m_hide')]);
+  const html = `<div class="group" style="margin:0">${items.map(([k, l, on]) => `<button class="setrow" data-go="${k}"><span class="tt">${esc(l)}</span>${on ? `<span class="chev" style="color:var(--accent)">${IC.ok(18)}</span>` : ''}</button>`).join('')}</div>`;
+  const p = ask({ title: colName(c), html, buttons: [{ label: t('close'), v: null, cls: 'b2' }] });
+  setTimeout(() => $$('.mb [data-go]').forEach(b => b.onclick = () => {
+    const mb = b.closest('.mb'); const k = b.dataset.go; mb.querySelector('.btn').click();
+    setTimeout(async () => {
+      if (k === 'asc') setSort(key, 1); else if (k === 'desc') setSort(key, -1); else if (k === 'sort0') setSort(key, 0);
+      else if (k === 'filter') await colFilterDlg(c); else if (k === 'filter0') { delete UI.colf[key]; renderChips(); refreshList(); }
+      else if (k === 'fit') autoFit(c);
+      else if (k === 'hide') { c.hidden = true; c.mts = Date.now(); colStamp(); scheduleSave(); refreshList(); }
+    }, 30);
+  }), 20);
+  await p;
+}
+async function colFilterDlg(c) {
+  const counts = new Map(); for (const r of DB.records) if (isLive(r)) { const v = cellVal(c, r); counts.set(v, (counts.get(v) || 0) + 1); }
+  const lab = v => v === '' ? t('empty_val') : (c.kind === 'check' ? (v ? t('yes_label') : t('no_label')) : v);
+  const all = [...counts.keys()].sort((a, b) => a === '' ? 1 : b === '' ? -1 : norm(a) < norm(b) ? -1 : norm(a) > norm(b) ? 1 : 0);
+  const sel = new Set(UI.colf[c.key] || all); let q = '';
+  const res = await ask({
+    title: t('f_title', { x: colName(c) }),
+    html: `<input class="inp" id="fq" placeholder="${esc(t('f_search'))}" autocomplete="off"><div style="display:flex;gap:8px;margin:8px 0"><button class="sbtn" id="fAll">${t('f_all')}</button><button class="sbtn" id="fNone">${t('f_none')}</button><span class="ss" id="fInfo" style="margin-left:auto;align-self:center"></span></div><div id="fl" style="max-height:42vh;overflow:auto"></div>`,
+    onMount: m => {
+      const draw = () => {
+        const nq = norm(q); const vis = all.filter(v => !nq || norm(lab(v)).includes(nq)); const show = vis.slice(0, 300);
+        $('#fl', m).innerHTML = show.map(v => `<label class="setrow" style="padding:8px 4px"><input type="checkbox" data-v="${esc(v)}" ${sel.has(v) ? 'checked' : ''} style="margin-right:10px"><span class="tt">${esc(lab(v))}</span><span class="ss">${counts.get(v)}</span></label>`).join('') + (vis.length > show.length ? `<div class="ss" style="padding:8px">${t('loading_more', { a: show.length, b: vis.length })}</div>` : '');
+        $('#fInfo', m).textContent = `${sel.size} / ${all.length}`;
+        $$('#fl input', m).forEach(i => i.onchange = () => { if (i.checked) sel.add(i.dataset.v); else sel.delete(i.dataset.v); $('#fInfo', m).textContent = `${sel.size} / ${all.length}`; });
+      };
+      $('#fq', m).oninput = e => { q = e.target.value; draw(); };
+      $('#fAll', m).onclick = () => { const nq = norm(q); all.filter(v => !nq || norm(lab(v)).includes(nq)).forEach(v => sel.add(v)); draw(); };
+      $('#fNone', m).onclick = () => { const nq = norm(q); all.filter(v => !nq || norm(lab(v)).includes(nq)).forEach(v => sel.delete(v)); draw(); };
+      draw();
+    },
+    buttons: [{ label: t('btn_cancel'), v: null }, { label: t('chg_apply'), cls: 'b1', v: true }]
+  });
+  if (!res) return;
+  if (sel.size >= all.length) delete UI.colf[c.key]; else UI.colf[c.key] = [...sel];
+  renderChips(); refreshList(); const w = $('#tw'); if (w) w.scrollTop = 0;
+}
 function refreshList() {
   if (UI.route !== 'books') return;
   const list = computeList(); const cols = tableCols();
@@ -464,7 +533,7 @@ function refreshList() {
 function renderCounter(list, total) {
   const c = $('#counter'); if (!c) return;
   const found = (UI.q || UI.filter !== 'all') ? ` · ${t('list_found', { n: `<b>${fmtInt(list.length)}</b>` })}` : '';
-  c.innerHTML = `<span>${t('list_total')}: <b>${fmtInt(total.total)}</b></span><span>· ${t('list_scanned')}: <b>${fmtInt(total.scanned)}</b></span>${found}<span class="pct">${fmtPct(total.scanned, total.total)}</span>`;
+  c.innerHTML = `<span>${t('list_total')}: <b>${fmtInt(total.total)}</b></span><span>· ${t('list_scanned')}: <b>${fmtInt(total.scanned)}</b></span>${H.rest && H.restUi ? `<span>· ${t('list_rest')}: <b>${fmtInt(total.rest)}</b></span>` : ''}${found}<span class="pct">${fmtPct(total.scanned, total.total)}</span>`;
   $('#prog').style.width = (total.total ? total.scanned / total.total * 100 : 0) + '%';
 }
 function renderBanner(total) {
@@ -521,7 +590,8 @@ function fieldInputHtml(c, val, id, opt = {}) {
   const v = val ?? '';
   if (c.kind === 'check') {
     const on = !!val;
-    return `<button type="button" class="scanrow ${on ? 'on' : 'off'}" id="${id}" data-check="${on ? 1 : 0}"><span class="bx">${on ? IC.ok(16) : ''}</span><span>${esc(opt.label || colName(c, true))}</span><span class="rt">${on ? IC.ok(22) : IC.no(22)}</span></button>`;
+    const lOn = c.key === 'restored' ? t('rest_card') : (opt.label || colName(c, true)), lOff = c.key === 'restored' ? t('rest_card_off') : lOn;
+    return `<button type="button" class="scanrow ${on ? 'on' : 'off'}" id="${id}" data-check="${on ? 1 : 0}"><span class="bx">${on ? IC.ok(16) : ''}</span><span class="lt" data-on="${esc(lOn)}" data-off="${esc(lOff)}">${esc(on ? lOn : lOff)}</span><span class="rt">${on ? IC.ok(22) : IC.no(22)}</span></button>`;
   }
   if (c.kind === 'type') return `<select class="inp" id="${id}"><option value="">${esc(t('opt_none'))}</option>${['manuscript', 'printed'].map(k => `<option value="${k}" ${v === k ? 'selected' : ''}>${esc(t('type_' + k))}</option>`).join('')}</select>`;
   if (c.kind === 'list') return `<select class="inp" id="${id}"><option value="">${esc(t('opt_none'))}</option>${(c.opts || []).concat(v && !(c.opts || []).includes(v) ? [v] : []).map(o => `<option ${v === o ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select>`;
@@ -534,6 +604,7 @@ function bindCheckButtons(root) {
     const on = b.dataset.check !== '1'; b.dataset.check = on ? 1 : 0;
     b.className = 'scanrow ' + (on ? 'on' : 'off');
     $('.bx', b).innerHTML = on ? IC.ok(16) : ''; $('.rt', b).innerHTML = on ? IC.ok(22) : IC.no(22);
+    const lt = $('.lt', b); if (lt) lt.textContent = on ? lt.dataset.on : lt.dataset.off;
     b.dispatchEvent(new Event('input', { bubbles: true }));
   });
 }

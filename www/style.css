@@ -251,3 +251,6 @@ select.inp{appearance:auto}
 .modal,#cardhost.on,.mb,.fab,.selbar,.toast{will-change:transform,opacity}
 #tw,.tw{overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
 .tr{touch-action:pan-x pan-y}
+.th>span[data-k]{cursor:pointer}
+.th>span.flt>i::before{content:'\25CF  ';color:var(--accent)}
+.chip.clr{color:var(--bad)}

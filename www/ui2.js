@@ -154,6 +154,7 @@ async function viewSettings(main) {
   ${hasPin ? `<div class="group"><div class="setrow col"><div class="tt">${t('set_autolock')}</div><select class="inp" id="sAl">${alOpts.map(([v, l]) => `<option value="${v}" ${H.autolock === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
   ${rowSwitch('sBio', t('set_bio'), bioOk ? t('set_bio_sub') : t('set_bio_na'), H.bio && bioOk, !bioOk)}
   </div>`: ''}
+  <div class="group">${rowSwitch('sRest', t('set_rest'), t('set_rest_sub'), H.rest)}${H.rest ? rowSwitch('sRestUi', t('set_restui'), t('set_restui_sub'), H.restUi) : ''}</div>
   <div class="group">${rowSwitch('sShot', t('set_shot'), Native.canBlockShots() ? t('set_shot_sub') : t('set_shot_na'), H.shot)}</div>
   <div class="group"><div class="setrow col"><div class="tt">${t('set_theme')}</div>${segHtml('sTheme', [['light', t('theme_light')], ['dark', t('theme_dark')]], H.theme)}</div>
   <div class="setrow col"><div class="tt">${t('set_font')}</div>${segHtml('sFont', [['s', t('font_s')], ['m', t('font_m')], ['l', t('font_l')]], H.font)}</div></div>
@@ -165,6 +166,8 @@ async function viewSettings(main) {
   $$('#sLang button', main).forEach(b => b.onclick = async () => { await setLang(b.dataset.v); });
   $$('#sTheme button', main).forEach(b => b.onclick = async () => { H.theme = b.dataset.v; applyPrefs(); await saveHeader(); again(); });
   $$('#sFont button', main).forEach(b => b.onclick = async () => { H.font = b.dataset.v; applyPrefs(); await saveHeader(); again(); });
+  $('#sRest').onclick = async () => { H.rest = !H.rest; if (!H.rest && UI.filter.includes('rest')) UI.filter = 'all'; UI.listKey = ''; await saveHeader(); again(); };
+  if ($('#sRestUi')) $('#sRestUi').onclick = async () => { H.restUi = !H.restUi; if (!H.restUi && (UI.filter === 'rest' || UI.filter === 'notrest')) UI.filter = 'all'; await saveHeader(); again(); };
   if ($('#sAl')) $('#sAl').onchange = async e => { H.autolock = +e.target.value; await saveHeader(); };
   $('#sEnc').onclick = async () => {
     if (hasPin) {

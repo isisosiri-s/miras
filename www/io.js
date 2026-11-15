@@ -134,6 +134,7 @@ function guessKind(values) {
 const ALIASES = [
   ['id', /^(id|#|№|n°|п\/п|№ ?п\/п)$/],
   ['inv', /(инв|inv|inwent|envanter|inventar)/],
+  ['restored', /(реставр|rejele|restor)/],
   ['scanned', null], // handled specially below
   ['title', /(назван|наименован|заглав|^ady|\bady\b|title|^name$|book name|kitap ad|имя книги)/],
   ['author', /(автор|awtor|author|yazar|muallif|составител)/],

@@ -1,6 +1,6 @@
 'use strict';
 /* Miras core: i18n, utils, crypto, storage, data model */
-const APP_VERSION = '1.1.10';
+const APP_VERSION = '1.1.11';
 const PBKDF_ITER = 250000;
 const TRASH_DAYS = 30;
 
@@ -164,9 +164,10 @@ const BUILTIN_COLS = [
   { key: 'pages', kind: 'number', i18n: 'col_pages' },
   { key: 'loc', kind: 'text', i18n: 'col_loc' },
   { key: 'scanned', kind: 'check', i18n: 'col_scan', card: 'list_scanned' },
+  { key: 'restored', kind: 'check', i18n: 'col_rest', card: 'rest_card' },
 ];
 const BUILTIN_KEYS = new Set(BUILTIN_COLS.map(c => c.key));
-const FIELD_KEYS = ['inv', 'title', 'author', 'lang', 'date', 'type', 'pages', 'loc', 'scanned'];
+const FIELD_KEYS = ['inv', 'title', 'author', 'lang', 'date', 'type', 'pages', 'loc', 'scanned', 'restored'];
 
 function defaultColumns() {
   return BUILTIN_COLS.map(c => ({ key: c.key, b: 1, kind: c.kind, names: null, hidden: false, opts: [], mts: 0 }));
@@ -335,7 +336,7 @@ function findByName(title, author, exceptUuid) {
 }
 function newRecord(vals, created, forcedId) {
   const r = { uuid: uuid(), id: forcedId || maxId() + 1, created: created || Date.now(), del: 0, vv: {}, ts: 0 };
-  for (const k of FIELD_KEYS) r[k] = k === 'scanned' ? false : '';
+  for (const k of FIELD_KEYS) r[k] = (k === 'scanned' || k === 'restored') ? false : '';
   Object.assign(r, vals); touch(r);
   DB.records.push(r); if (DB._byUuid) DB._byUuid.set(r.uuid, r);
   scheduleSave(); return r;
@@ -366,17 +367,18 @@ function nextInv(prev) {
   return m[1] + n + m[3];
 }
 function counts() {
-  let total = 0, scanned = 0;
-  for (const r of DB.records) if (isLive(r)) { total++; if (r.scanned) scanned++; }
-  return { total, scanned };
+  let total = 0, scanned = 0, rest = 0;
+  for (const r of DB.records) if (isLive(r)) { total++; if (r.scanned) scanned++; if (r.restored) rest++; }
+  return { total, scanned, rest };
 }
 
 // ---------- columns ----------
-function visibleCols() { return DB.columns.filter(c => !c.del && !c.hidden); }
+const restOff = c => c.key === 'restored' && !H.rest;
+function visibleCols() { return DB.columns.filter(c => !c.del && !c.hidden && !restOff(c)); }
 // phone list: ID, inventory number, title and scan flag by default; the user can toggle any column
 const PHONE_DEFAULT = ['id', 'inv', 'title', 'scanned'];
 function onPhone(c) { return c.ph !== undefined ? !!c.ph : PHONE_DEFAULT.includes(c.key); }
-function liveCols() { return DB.columns.filter(c => !c.del); }
+function liveCols() { return DB.columns.filter(c => !c.del && !restOff(c)); }
 function colDef(key) { return DB.columns.find(c => c.key === key && !c.del); }
 function builtinOf(key) { return BUILTIN_COLS.find(b => b.key === key); }
 function colName(c, forCard) {
