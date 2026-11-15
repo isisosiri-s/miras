@@ -20,6 +20,7 @@ const IC = {
   book: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2V5z"/><path d="M19 19v2H6"/></svg>',
   cols: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M15 4v16"/></svg>',
   imp: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M4 20h16"/></svg>',
+  report: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>',
   stats: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 20V11M12 20V4M19 20v-6"/></svg>',
   gear: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
   trashn: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>',
@@ -263,7 +264,7 @@ function showSetup() {
 }
 
 // ---------- shell ----------
-const NAV = [['books', 'nav_books', 'book'], ['stats', 'nav_stats', 'stats'], ['trash', 'nav_trash', 'trashn'], ['columns', 'nav_columns', 'cols'], ['ie', 'nav_import', 'imp'], ['sync', 'nav_sync', 'sync'], ['settings', 'nav_settings', 'gear']];
+const NAV = [['books', 'nav_books', 'book'], ['stats', 'nav_stats', 'stats'], ['reports', 'nav_reports', 'report'], ['trash', 'nav_trash', 'trashn'], ['columns', 'nav_columns', 'cols'], ['ie', 'nav_import', 'imp'], ['sync', 'nav_sync', 'sync'], ['settings', 'nav_settings', 'gear']];
 function mountShell() {
   UI.route = 'books'; UI.routeLayer = null; UI.card = null;
   appEl().innerHTML = `<div class="shell" id="shell">
@@ -296,7 +297,7 @@ function goRoute(r) {
   if (UI.card) closeCard(false).then(ok => { if (ok) goRoute(r); });
   else {
     if (!UI.routeLayer) {
-      UI.routeLayer = pushLayer({ onBack: () => { UI.route = 'books'; UI.routeLayer = null; renderRoute(); return true; } });
+      UI.routeLayer = pushLayer({ onBack: () => { if (UI.route === 'reports' && repBack()) return false; UI.route = 'books'; UI.routeLayer = null; renderRoute(); return true; } });
     }
     UI.route = r; renderRoute(); animRoute();
   }
@@ -304,7 +305,7 @@ function goRoute(r) {
 function renderRoute() {
   const main = $('#main'); if (!main) return;
   $$('.side .nav[data-r]').forEach(b => b.classList.toggle('on', b.dataset.r === UI.route));
-  const views = { books: viewBooks, stats: viewStats, trash: viewTrash, columns: viewColumns, settings: viewSettings, ie: viewIE, sync: viewSync, import: viewImport };
+  const views = { books: viewBooks, stats: viewStats, reports: viewReports, trash: viewTrash, columns: viewColumns, settings: viewSettings, ie: viewIE, sync: viewSync, import: viewImport };
   UI.selMode = UI.selMode && UI.route === 'books';
   (views[UI.route] || viewBooks)(main);
 }
@@ -319,7 +320,7 @@ function bindMobBar() {
   const m = $('#mbMenu'); if (m) m.onclick = openMenu;
 }
 async function openMenu() {
-  const items = [['stats', 'nav_stats'], ['trash', 'nav_trash'], ['columns', 'nav_columns'], ['ie', 'nav_import'], ['sync', 'nav_sync'], ['settings', 'nav_settings']];
+  const items = [['stats', 'nav_stats'], ['reports', 'nav_reports'], ['trash', 'nav_trash'], ['columns', 'nav_columns'], ['ie', 'nav_import'], ['sync', 'nav_sync'], ['settings', 'nav_settings']];
   const html = items.map(([k, lab]) => `<button class="setrow" data-go="${k}"><span class="tt">${t(lab)}</span><span class="chev">${IC.chev}</span></button>`).join('') +
     `<button class="setrow" data-go="__sel"><span class="tt">${t('menu_select')}</span></button>${Auth.hasPin() ? `<button class="setrow" data-go="__lock"><span class="tt">${t('nav_lock')}</span></button>` : ''}`;
   const p = ask({ html: `<div class="group" style="margin:0">${html}</div>`, buttons: [{ label: t('close'), v: null, cls: 'b2' }] });

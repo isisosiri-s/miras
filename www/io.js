@@ -79,7 +79,7 @@ async function exportColumnXlsx(colKey) {
 
 // ---------- backup ----------
 function backupPayload() {
-  return { kind: 'backup', created: Date.now(), device: { id: H.deviceId, kind: deviceKind() }, columns: DB.columns, colsTs: DB.colsTs, records: DB.records };
+  return { kind: 'backup', created: Date.now(), device: { id: H.deviceId, kind: deviceKind() }, columns: DB.columns, colsTs: DB.colsTs, records: DB.records, reports: DB.reports };
 }
 async function createBackup() {
   const text = await sealFile(backupPayload(), DB._pw, H.enc);
@@ -90,7 +90,7 @@ async function createBackup() {
 }
 async function restoreBackup(payload) {
   if (!payload || payload.kind !== 'backup') throw new Error('format');
-  loadDataObj({ records: payload.records, columns: payload.columns, colsTs: payload.colsTs, draft: null });
+  loadDataObj({ records: payload.records, columns: payload.columns, colsTs: payload.colsTs, draft: null, reports: payload.reports });
   DB.columns = DB.columns; scheduleSave(); await flushSave();
   return liveRecords().length;
 }
