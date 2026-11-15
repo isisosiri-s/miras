@@ -325,28 +325,36 @@ function tableCols() {
   if (isWide()) return vis;
   return vis.filter(c => c.kind === 'id' || c.key === 'inv' || onPhone(c));
 }
-function colWidth(c) {
-  if (!isWide()) {
-    switch (c.key) { case 'id': return '34px'; case 'inv': return '86px'; case 'title': return 'minmax(190px,1fr)'; case 'scanned': return '48px'; case 'pages': return '56px'; case 'date': return '90px'; case 'type': return '96px'; case 'author': return 'minmax(140px,1fr)'; case 'lang': return 'minmax(90px,1fr)'; case 'loc': return 'minmax(110px,1fr)'; }
-    return c.kind === 'check' ? '56px' : c.kind === 'number' ? '72px' : 'minmax(110px,1fr)';
-  }
-  switch (c.key) {
-    case 'id': return '46px'; case 'inv': return '104px'; case 'title': return 'minmax(120px,2fr)';
-    case 'author': return 'minmax(90px,1.3fr)'; case 'scanned': return '56px'; case 'pages': return '66px';
-    case 'date': return '80px'; case 'type': return '100px'; case 'lang': return 'minmax(70px,1fr)'; case 'loc': return 'minmax(80px,1.2fr)';
-  }
-  return c.kind === 'check' ? '56px' : c.kind === 'number' ? '80px' : 'minmax(80px,1fr)';
+// ---- column widths (per device, adjustable) ----
+const CW_DEF = { id: [40, 46], inv: [92, 104], title: [240, 320], author: [180, 200], lang: [110, 120], date: [100, 110], type: [110, 120], pages: [76, 80], loc: [170, 190], scanned: [64, 64] };
+const CB_W = 36, CW_MIN = 36, CW_MAX = 600;
+const cwMode = () => isWide() ? 'w' : 'p';
+function defW(c) { const d = CW_DEF[c.key]; return d ? d[cwMode() === 'w' ? 1 : 0] : (c.kind === 'check' ? 64 : c.kind === 'number' ? 84 : 170); }
+function colW(c) { const u = H.colw && H.colw[cwMode()] && H.colw[cwMode()][c.key]; return u || defW(c); }
+function setColW(c, w) {
+  H.colw = H.colw || { p: {}, w: {} }; const m = cwMode(); H.colw[m] = H.colw[m] || {};
+  if (!w) delete H.colw[m][c.key]; else H.colw[m][c.key] = Math.max(CW_MIN, Math.min(CW_MAX, Math.round(w)));
 }
-function gridTpl(cols) { return (isWide() || UI.selMode ? '24px ' : '') + cols.map(colWidth).join(' '); }
-// sticky (frozen) left columns: checkbox, ID, inventory number
+function layout(cols) {
+  let x = 0; const L = {}, ws = [];
+  if (isWide() || UI.selMode) { L.cb = 0; x += CB_W; ws.push(CB_W); }
+  for (const c of cols) { const w = colW(c); if (c.kind === 'id') L.id = x; else if (c.key === 'inv') L.inv = x; ws.push(w); x += w; }
+  return { tpl: ws.map(w => w + 'px').join(' '), L, total: x };
+}
+function gridTpl(cols) { return layout(cols).tpl; }
+function applyLayout(cols) {
+  const tw = $('#tw'); if (!tw) return; const o = layout(cols);
+  tw.style.setProperty('--tpl', o.tpl);
+  for (const k of ['cb', 'id', 'inv']) tw.style.setProperty('--l-' + k, (o.L[k] || 0) + 'px');
+}
+// sticky (frozen) left columns: checkbox, ID, inventory number (left offsets come from CSS variables)
 function stickyLefts(cols) {
-  const pad = isWide() ? 14 : 12, gap = isWide() ? 10 : 8, wId = isWide() ? 46 : 34, wInv = isWide() ? 104 : 86;
-  let x = pad; const o = {};
-  if (isWide() || UI.selMode) { o.cb = x; o.first = 'cb'; x += 24 + gap; }
-  if (cols[0] && cols[0].kind === 'id') { o.id = x; if (!o.first) o.first = 'id'; x += wId + gap; if (cols[1] && cols[1].key === 'inv') { o.inv = x; o.last = 'inv'; } else o.last = 'id'; }
+  const o = {};
+  if (isWide() || UI.selMode) { o.cb = 0; o.first = 'cb'; }
+  if (cols[0] && cols[0].kind === 'id') { o.id = 0; if (!o.first) o.first = 'id'; if (cols[1] && cols[1].key === 'inv') { o.inv = 0; o.last = 'inv'; } else o.last = 'id'; }
   return o;
 }
-const stk = (o, k) => o[k] !== undefined ? ` stk${o.first === k ? ' stkf' : ''}${o.last === k ? ' stkl' : ''}" style="left:${o[k]}px` : '';
+const stk = (o, k) => o[k] !== undefined ? ` stk${o.first === k ? ' stkf' : ''}${o.last === k ? ' stkl' : ''}" style="left:var(--l-${k})` : '';
 function computeList() {
   const key = `${DB.rev}|${UI.q}|${UI.filter}`;
   if (UI.listKey === key) return UI.list;
@@ -372,7 +380,7 @@ function viewBooks(main) {
   $('#bNew').onclick = () => openCard(null); $('#fab').onclick = () => openCard(null);
   $('#bImp').onclick = () => startImport(); $('#bExp').onclick = () => goRoute('ie');
   renderChips();
-  $('#tw').addEventListener('scroll', onListScroll, { passive: true });
+  $('#tw').addEventListener('scroll', onListScroll, { passive: true }); bindResize();
   const rows = $('#rows');
   rows.addEventListener('click', onRowClick);
   let lp = null, lpFired = false;
@@ -391,27 +399,39 @@ function renderChips() {
 function rowHtml(r, cols, tpl) {
   const sel = UI.sel.has(r.uuid);
   const SL = stickyLefts(cols);
-  const cb = (isWide() || UI.selMode) ? `<span class="cb ${sel ? 'on' : ''}${stk(SL, 'cb')}" data-cb="1">${sel ? IC.ok(14, '#fff') : ''}</span>` : '';
+  const cb = (isWide() || UI.selMode) ? `<span class="cbc${stk(SL, 'cb')}" data-cb="1"><b class="cb ${sel ? 'on' : ''}">${sel ? IC.ok(14, '#fff') : ''}</b></span>` : '';
   const cells = cols.map(c => {
-    if (c.kind === 'id') return `<span class="idc${stk(SL, 'id')}">${r.id}</span>`;
+    if (c.kind === 'id') return `<span class="idc${stk(SL, 'id')}"><i>${r.id}</i></span>`;
     if (c.kind === 'check') return `<span class="mid">${r[c.key] ? IC.ok(20) : IC.no(20)}</span>`;
-    if (c.kind === 'number') return `<span class="num">${esc(cellText(c, r))}</span>`;
-    return `<span class="${c.key === 'inv' ? 'inv' + stk(SL, 'inv') : 'tx'}">${esc(cellText(c, r))}</span>`;
+    if (c.kind === 'number') return `<span class="num"><i>${esc(cellText(c, r))}</i></span>`;
+    return `<span class="${c.key === 'inv' ? 'inv' + stk(SL, 'inv') : 'tx'}"><i>${esc(cellText(c, r))}</i></span>`;
   }).join('');
   const cur = UI.card && UI.card.uuid === r.uuid ? ' cur' : '';
-  return `<div class="tr${sel ? ' sel' : ''}${cur}" data-u="${r.uuid}" style="grid-template-columns:${tpl}">${cb}${cells}</div>`;
+  return `<div class="tr${sel ? ' sel' : ''}${cur}" data-u="${r.uuid}">${cb}${cells}</div>`;
 }
 function renderHead(cols, tpl) {
   const th = $('#th'); if (!th) return;
   const showCb = isWide() || UI.selMode;
-  th.style.gridTemplateColumns = tpl;
   const SL = stickyLefts(cols);
-  th.innerHTML = (showCb ? `<span class="${stk(SL, 'cb').slice(1)}"></span>` : '') + cols.map(c => `<span class="${c.kind === 'number' ? 'num' : c.kind === 'check' ? 'mid' : ''}${c.kind === 'id' ? stk(SL, 'id') : c.key === 'inv' ? stk(SL, 'inv') : ''}">${esc(colName(c))}</span>`).join('');
+  th.innerHTML = (showCb ? `<span class="${stk(SL, 'cb').slice(1)}"></span>` : '') + cols.map(c => `<span class="${c.kind === 'number' ? 'num' : c.kind === 'check' ? 'mid' : ''}${c.kind === 'id' ? stk(SL, 'id') : c.key === 'inv' ? stk(SL, 'inv') : ''}"><i>${esc(colName(c))}</i><u class="rz" data-k="${c.key}"></u></span>`).join('');
+}
+function bindResize() {
+  const th = $('#th'); if (!th) return;
+  th.addEventListener('pointerdown', e => {
+    const h = e.target.closest('.rz'); if (!h) return;
+    e.preventDefault(); e.stopPropagation();
+    const cols = tableCols(); const c = cols.find(x => x.key === h.dataset.k); if (!c) return;
+    const w0 = colW(c), x0 = e.clientX; h.setPointerCapture(e.pointerId); h.classList.add('on');
+    const mv = ev => { setColW(c, w0 + ev.clientX - x0); applyLayout(cols); };
+    const up = () => { h.removeEventListener('pointermove', mv); h.removeEventListener('pointerup', up); h.removeEventListener('pointercancel', up); h.classList.remove('on'); saveHeader(); };
+    h.addEventListener('pointermove', mv); h.addEventListener('pointerup', up); h.addEventListener('pointercancel', up);
+  });
+  th.addEventListener('click', e => { if (e.target.closest('.rz')) e.stopPropagation(); });
 }
 function refreshList() {
   if (UI.route !== 'books') return;
-  const list = computeList(); const cols = tableCols(); const tpl = gridTpl(cols);
-  renderHead(cols, tpl);
+  const list = computeList(); const cols = tableCols(); const tpl = '';
+  applyLayout(cols); renderHead(cols, tpl);
   const rows = $('#rows'); if (!rows) return;
   const total = counts();
   if (!list.length) {

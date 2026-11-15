@@ -108,10 +108,17 @@ async function colDialog(def) {
   const afterOpts = isNew ? `<div class="fld"><div class="lbl">${t('insert_after')}</div><select class="inp" id="after"><option value="__start">${t('col_pos_start')}</option>${liveCols().filter(c => c.kind !== 'id').map(c => `<option value="${c.key}">${esc(colName(c))}</option>`).join('')}</select></div>` : '';
   const typeChips = isNew ? `<div class="fld"><div class="lbl">${t('col_type_label')}</div><div class="typechips" id="kinds">${KINDS.map(k => `<button class="chip ${k === kind ? 'on' : ''}" data-k="${k}">${t(KIND_LABEL[k])}</button>`).join('')}</div></div>` : '';
   const optsBox = `<div class="fld ${kind === 'list' ? '' : 'hidden'}" id="optsw"><div class="lbl">${t('col_opts')}</div><textarea class="inp" id="opts" rows="4">${esc((def && def.opts || []).join('\n'))}</textarea></div>`;
-  let result = false;
+  let result = false, wNew;
+  const curW = def ? colW(def) : 0;
+  const widthBox = isNew ? '' : `<div class="fld"><div class="lbl">${t('col_width')}: <b id="wv">${curW}</b> px</div><div class="typechips" id="wch"><button class="chip" data-p="0.6">${t('w_narrow')}</button><button class="chip" data-p="1">${t('w_mid')}</button><button class="chip" data-p="1.7">${t('w_wide')}</button><button class="chip" data-p="0">${t('w_reset')}</button></div><input type="range" id="wr" min="${CW_MIN}" max="${CW_MAX}" step="2" value="${curW}" style="width:100%;margin-top:8px"></div>`;
   await ask({
-    title: isNew ? t('newcol_title') : t('col_edit'), html: nameInp + typeChips + optsBox + afterOpts,
+    title: isNew ? t('newcol_title') : t('col_edit'), html: nameInp + widthBox + typeChips + optsBox + afterOpts,
     onMount: m => {
+      if (!isNew) {
+        const wr = $('#wr', m), wv = $('#wv', m);
+        wr.oninput = () => { wNew = +wr.value; wv.textContent = wr.value; };
+        $$('#wch .chip', m).forEach(ch => ch.onclick = () => { const f = +ch.dataset.p; if (!f) { wNew = 0; wr.value = defW(def); wv.textContent = defW(def); } else { wNew = Math.max(CW_MIN, Math.min(CW_MAX, Math.round(defW(def) * f))); wr.value = wNew; wv.textContent = wNew; } });
+      }
       if (isNew) { const s = $('#after', m); s.value = liveCols().filter(c => c.kind !== 'id').slice(-1)[0].key; }
       $$('#kinds .chip', m).forEach(ch => ch.onclick = () => { kind = ch.dataset.k; $$('#kinds .chip', m).forEach(x => x.classList.toggle('on', x === ch)); $('#optsw', m).classList.toggle('hidden', kind !== 'list'); });
       if (!isNew && def.kind !== 'list') $('#optsw', m).classList.add('hidden');
@@ -124,6 +131,7 @@ async function colDialog(def) {
         const opts = $('#opts', m).value.split('\n').map(x => x.trim()).filter(Boolean);
         if (isNew) addColumn({ names, kind, opts: kind === 'list' ? opts : [], afterKey: $('#after', m).value });
         else { def.names = Object.values(names).some(Boolean) ? names : null; if (def.kind === 'list') def.opts = opts; def.mts = Date.now(); colStamp(); scheduleSave(); }
+        if (!isNew && wNew !== undefined) { setColW(def, wNew); saveHeader(); UI.listKey = ''; }
         result = true; return true;
       }
     }],
