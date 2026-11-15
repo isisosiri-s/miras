@@ -310,13 +310,13 @@ function bindMobBar() {
   const m = $('#mbMenu'); if (m) m.onclick = openMenu;
 }
 async function openMenu() {
-  const items = [['trash', 'nav_trash'], ['columns', 'nav_columns'], ['ie', 'nav_import'], ['sync', 'nav_sync'], ['settings', 'nav_settings']];
+  const items = [['__fr', 'menu_fr'], ['__jump', 'menu_jump'], ['__fs', 'menu_fs'], ['trash', 'nav_trash'], ['columns', 'nav_columns'], ['ie', 'nav_import'], ['sync', 'nav_sync'], ['settings', 'nav_settings']];
   const html = items.map(([k, lab]) => `<button class="setrow" data-go="${k}"><span class="tt">${t(lab)}</span><span class="chev">${IC.chev}</span></button>`).join('') +
     `<button class="setrow" data-go="__sel"><span class="tt">${t('menu_select')}</span></button>${Auth.hasPin() ? `<button class="setrow" data-go="__lock"><span class="tt">${t('nav_lock')}</span></button>` : ''}`;
   const p = ask({ html: `<div class="group" style="margin:0">${html}</div>`, buttons: [{ label: t('close'), v: null, cls: 'b2' }] });
   setTimeout(() => $$('.mb [data-go]').forEach(b => b.onclick = () => {
     const mb = b.closest('.mb'); const k = b.dataset.go; mb.querySelector('.btn').click();
-    setTimeout(() => { if (k === '__sel') enterSelMode(); else if (k === '__lock') doLock(); else goRoute(k); }, 30);
+    setTimeout(() => { if (k === '__sel') enterSelMode(); else if (k === '__fr') findReplaceDlg(); else if (k === '__jump') jumpDlg(); else if (k === '__fs') filterSetsDlg(); else if (k === '__lock') doLock(); else goRoute(k); }, 30);
   }), 20);
   await p;
 }
@@ -328,7 +328,7 @@ function tableCols() {
   return vis.filter(c => c.kind === 'id' || c.key === 'inv' || onPhone(c));
 }
 // ---- column widths (per device, adjustable) ----
-const CW_DEF = { id: [40, 46], inv: [92, 104], title: [240, 320], author: [180, 200], lang: [110, 120], date: [100, 110], type: [110, 120], pages: [76, 80], loc: [170, 190], scanned: [64, 64], restored: [72, 72] };
+const CW_DEF = { id: [40, 46], inv: [92, 104], title: [240, 320], author: [180, 200], lang: [110, 120], date: [100, 110], type: [110, 120], pages: [76, 80], loc: [170, 190], scanned: [64, 64], restored: [72, 72], note: [200, 280] };
 const CB_W = 36, CW_MIN = 36, CW_MAX = 600;
 const cwMode = () => isWide() ? 'w' : 'p';
 function defW(c) { const d = CW_DEF[c.key]; return d ? d[cwMode() === 'w' ? 1 : 0] : (c.kind === 'check' ? 64 : c.kind === 'number' ? 84 : 170); }
@@ -361,12 +361,13 @@ const cellVal = (c, r) => String(cellText(c, r) ?? '').trim();
 function sortKeyOf(c, r) { if (c.kind === 'id') return r.id; if (c.kind === 'number') { const v = r[c.key]; return v === '' || v == null ? null : (typeof v === 'number' ? v : parseNum(String(v))); } if (c.kind === 'check') return r[c.key] ? 1 : 0; const v = cellVal(c, r); return v ? norm(v).replace(/\d+/g, m => m.padStart(12, '0')) : null; }
 function computeList() {
   const cf = UI.colf || {};
-  const key = `${DB.rev}|${UI.q}|${UI.filter}|${UI.sort ? UI.sort.key + UI.sort.dir : ''}|${Object.keys(cf).map(k => k + ':' + cf[k].join('\u0001')).join('|')}`;
+  const key = `${DB.rev}|${H.compact ? 1 : 0}|${UI.q}|${UI.filter}|${UI.sort ? UI.sort.key + UI.sort.dir : ''}|${Object.keys(cf).map(k => k + ':' + cf[k].join('\u0001')).join('|')}`;
   if (UI.listKey === key) return UI.list;
   const toks = norm(UI.q).split(' ').filter(Boolean);
   let l = DB.records.filter(isLive);
   if (UI.filter === 'scanned') l = l.filter(r => r.scanned); else if (UI.filter === 'not') l = l.filter(r => !r.scanned);
   else if (UI.filter === 'rest') l = l.filter(r => r.restored); else if (UI.filter === 'notrest') l = l.filter(r => !r.restored);
+  else if (UI.filter === 'dups') { const d = dupSet(); l = l.filter(r => d.has(r.uuid)); }
   else if (UI.filter === 'recent') { const lim = Date.now() - 7 * 86400000; l = l.filter(r => (r.ts || 0) >= lim || (r.created || 0) >= lim); }
   if (toks.length) l = l.filter(r => { const s = searchKey(r); return toks.every(x => s.includes(x)); });
   for (const k of Object.keys(cf)) { const c = colDef(k); if (!c) continue; const set = new Set(cf[k]); l = l.filter(r => set.has(cellVal(c, r))); }
@@ -406,7 +407,7 @@ function viewBooks(main) {
 function renderChips() {
   const c = $('#chips'); if (!c) return;
   const rf = H.rest && H.restUi, nf = Object.keys(UI.colf || {}).length;
-  c.innerHTML = [['all', t('f_all')], ['scanned', IC.ok(14) + t('f_scanned')], ['not', IC.no(14) + t('f_notscanned')], ...(rf ? [['rest', IC.ok(14) + t('f_rest')], ['notrest', IC.no(14) + t('f_notrest')]] : []), ['recent', t('f_recent')]].map(([k, l]) => `<button class="chip ${UI.filter === k ? 'on' : ''}" data-f="${k}">${l}</button>`).join('') + (nf ? `<button class="chip clr" data-f="__clr">${IC.no(14)}${t('f_clear_cols', { n: nf })}</button>` : '');
+  c.innerHTML = [['all', t('f_all')], ['scanned', IC.ok(14) + t('f_scanned')], ['not', IC.no(14) + t('f_notscanned')], ...(rf ? [['rest', IC.ok(14) + t('f_rest')], ['notrest', IC.no(14) + t('f_notrest')]] : []), ['recent', t('f_recent')], ['dups', t('f_dups')]].map(([k, l]) => `<button class="chip ${UI.filter === k ? 'on' : ''}" data-f="${k}">${l}</button>`).join('') + (nf ? `<button class="chip clr" data-f="__clr">${IC.no(14)}${t('f_clear_cols', { n: nf })}</button>` : '');
   $$('.chip', c).forEach(b => b.onclick = () => { if (b.dataset.f === '__clr') UI.colf = {}; else UI.filter = b.dataset.f; renderChips(); refreshList(); const w = $('#tw'); if (w) w.scrollTop = 0; });
 }
 function rowHtml(r, cols, tpl) {
@@ -420,7 +421,8 @@ function rowHtml(r, cols, tpl) {
     return `<span class="${c.key === 'inv' ? 'inv' + stk(SL, 'inv') : 'tx'}"><i>${esc(cellText(c, r))}</i></span>`;
   }).join('');
   const cur = UI.card && UI.card.uuid === r.uuid ? ' cur' : '';
-  return `<div class="tr${sel ? ' sel' : ''}${cur}" data-u="${r.uuid}">${cb}${cells}</div>`;
+  const dp = (H.dupHl || UI.filter === 'dups') && dupSet().has(r.uuid) ? ' dup' : '', fl = UI.flash === r.uuid ? ' flash' : '';
+  return `<div class="tr${sel ? ' sel' : ''}${cur}${dp}${fl}" data-u="${r.uuid}">${cb}${cells}</div>`;
 }
 function renderHead(cols, tpl) {
   const th = $('#th'); if (!th) return;
@@ -439,13 +441,28 @@ function bindResize() {
     const up = () => { h.removeEventListener('pointermove', mv); h.removeEventListener('pointerup', up); h.removeEventListener('pointercancel', up); h.classList.remove('on'); saveHeader(); };
     h.addEventListener('pointermove', mv); h.addEventListener('pointerup', up); h.addEventListener('pointercancel', up);
   });
-  th.addEventListener('click', e => { if (e.target.closest('.rz')) { e.stopPropagation(); return; } const sp = e.target.closest('#th>span[data-k]'); if (sp) colMenu(sp.dataset.k); });
+  let drag = null;
+  th.addEventListener('pointerdown', e => {
+    if (e.pointerType !== 'mouse' || e.target.closest('.rz')) return;
+    const sp = e.target.closest('#th>span[data-k]'); if (!sp || sp.dataset.k === 'id') return;
+    drag = { k: sp.dataset.k, x: e.clientX, on: false };
+  });
+  window.addEventListener('pointermove', e => { if (drag && !drag.on && Math.abs(e.clientX - drag.x) > 10) { drag.on = true; document.body.style.cursor = 'grabbing'; } });
+  window.addEventListener('pointerup', e => {
+    if (!drag) return; const d = drag; drag = null; document.body.style.cursor = '';
+    if (!d.on) return; UI.noHeadClick = true; setTimeout(() => { UI.noHeadClick = false; }, 50);
+    const el = document.elementFromPoint(e.clientX, e.clientY); const tg = el && el.closest('#th>span[data-k]');
+    if (!tg || tg.dataset.k === d.k || tg.dataset.k === 'id') return;
+    const arr = DB.columns, a = arr.findIndex(c => c.key === d.k), b = arr.findIndex(c => c.key === tg.dataset.k);
+    if (a < 0 || b < 0) return; const [m] = arr.splice(a, 1); arr.splice(b, 0, m); colStamp(); scheduleSave(); UI.listKey = ''; refreshList();
+  });
+  th.addEventListener('click', e => { if (UI.noHeadClick) return; if (e.target.closest('.rz')) { e.stopPropagation(); return; } const sp = e.target.closest('#th>span[data-k]'); if (sp) colMenu(sp.dataset.k); });
 }
 // ---- virtualised list: only the rows near the viewport exist in the DOM (fixed row height) ----
 const VBUF = 10;
 UI.sort = null; UI.colf = {};
 UI.vr = { rh: 66, from: -1, to: -1, cols: null, raf: 0 };
-function rowHeightPx() { return Math.round(parseFloat(getComputedStyle(document.documentElement).fontSize) * 4.1); }
+function rowHeightPx() { return Math.round(parseFloat(getComputedStyle(document.documentElement).fontSize) * (H.compact ? 2.7 : 4.1)); }
 function renderWindow(force) {
   const rows = $('#rows'), tw = $('#tw'); const list = UI.list; if (!rows || !tw || !list || !list.length) return;
   const v = UI.vr, rh = v.rh, n = list.length;
@@ -479,6 +496,7 @@ async function colMenu(key) {
   if (sorted) items.push(['sort0', t('m_sort_off')]);
   if (c.kind !== 'id') items.push(['filter', t('m_filter'), filt]); if (filt) items.push(['filter0', t('m_filter_off')]);
   items.push(['fit', t('m_fit')]);
+  if (c.kind !== 'id') { items.push(['left', t('m_left')]); items.push(['right', t('m_right')]); }
   if (c.kind !== 'id' && !(builtinOf(c.key) || {}).noHide) items.push(['hide', t('m_hide')]);
   const html = `<div class="group" style="margin:0">${items.map(([k, l, on]) => `<button class="setrow" data-go="${k}"><span class="tt">${esc(l)}</span>${on ? `<span class="chev" style="color:var(--accent)">${IC.ok(18)}</span>` : ''}</button>`).join('')}</div>`;
   const p = ask({ title: colName(c), html, buttons: [{ label: t('close'), v: null, cls: 'b2' }] });
@@ -488,6 +506,7 @@ async function colMenu(key) {
       if (k === 'asc') setSort(key, 1); else if (k === 'desc') setSort(key, -1); else if (k === 'sort0') setSort(key, 0);
       else if (k === 'filter') await colFilterDlg(c); else if (k === 'filter0') { delete UI.colf[key]; renderChips(); refreshList(); }
       else if (k === 'fit') autoFit(c);
+      else if (k === 'left' || k === 'right') { moveColumn(key, k === 'left' ? -1 : 1); UI.listKey = ''; refreshList(); }
       else if (k === 'hide') { c.hidden = true; c.mts = Date.now(); colStamp(); scheduleSave(); refreshList(); }
     }, 30);
   }), 20);
@@ -525,7 +544,7 @@ function refreshList() {
   applyLayout(cols); renderHead(cols, '');
   const rows = $('#rows'), tw = $('#tw'); if (!rows) return;
   const total = counts();
-  const v = UI.vr; v.cols = cols; v.rh = rowHeightPx(); tw.style.setProperty('--rh', v.rh + 'px');
+  const v = UI.vr; v.cols = cols; v.rh = rowHeightPx(); tw.style.setProperty('--rh', v.rh + 'px'); tw.classList.toggle('compact', !!H.compact);
   if (!list.length) {
     rows.style.paddingTop = rows.style.paddingBottom = '0px'; v.from = v.to = -1;
     rows.innerHTML = `<div class="empty"><b>${total.total ? t('list_none') : t('list_empty')}</b>${total.total ? '' : t('list_empty_sub')}</div>`;
@@ -599,6 +618,7 @@ function fieldInputHtml(c, val, id, opt = {}) {
   if (c.kind === 'list') return `<select class="inp" id="${id}"><option value="">${esc(t('opt_none'))}</option>${(c.opts || []).concat(v && !(c.opts || []).includes(v) ? [v] : []).map(o => `<option ${v === o ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select>`;
   if (c.kind === 'date') return `<input class="inp" id="${id}" type="date" value="${esc(v)}">`;
   if (c.kind === 'number') return `<input class="inp" id="${id}" inputmode="decimal" autocomplete="off" value="${esc(typeof v === 'number' ? String(v).replace('.', LANG === 'en' ? '.' : ',') : v)}">`;
+  if (c.key === 'note') return `<textarea class="inp" id="${id}" rows="3" style="resize:vertical;min-height:4.5em">${esc(v)}</textarea>`;
   return `<input class="inp" id="${id}" autocomplete="off" value="${esc(v)}" ${opt.list ? `list="${opt.list}"` : ''}>`;
 }
 function bindCheckButtons(root) {

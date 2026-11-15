@@ -36,7 +36,6 @@ const Native = {
   },
   // colour the system-bar areas: top = header / lock colour, bottom = page colour
   paintBars() {
-    if (!this.cap) return;
     let t, b;
     if (document.querySelector('.lockscr, #splash:not(.out)')) { t = '#4A2D17'; b = '#241208'; }
     else {
@@ -46,6 +45,11 @@ const Native = {
       b = hex(cs(document.body)) || hex(getComputedStyle(document.documentElement).getPropertyValue('--bg')) || '#F6F1E9';
     }
     const k = t + b; if (k === this._barKey) return; this._barKey = k;
+    // page is drawn edge-to-edge under the bars: paint the safe-area strips with the screen colours
+    const st = 'max(var(--safe-area-inset-top,0px),env(safe-area-inset-top,0px))';
+    document.documentElement.style.background = `linear-gradient(to bottom, ${t} 0, ${t} ${st}, ${b} ${st}, ${b} 100%)`;
+    document.body.style.background = 'transparent';
+    if (!this.cap) return;
     try { const P = this.plugin('MirasBars') || this.cap.registerPlugin('MirasBars'); P.set({ top: t, bottom: b }).catch(e => { this._barKey = null; console.warn('pb', e); }); } catch (e) { this._barKey = null; console.warn('pb', e); }
   },
   initBars() {
