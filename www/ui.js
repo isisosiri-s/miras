@@ -606,7 +606,7 @@ function renderBanner(total) {
   const d = H.lastBackup ? Math.floor((Date.now() - H.lastBackup) / 86400000) : null;
   if (d !== null && d <= 7) { b.innerHTML = ''; return; }
   b.innerHTML = `<div class="banner">${IC.warn}<span>${d === null ? t('backup_never') : t('backup_remind', { d })}</span><button class="sbtn" id="bkBtn">${t('set_backup_btn')}</button></div>`;
-  $('#bkBtn').onclick = async () => { const n = await createBackup(); toast(t('backup_done', { f: n })); renderBanner(counts()); };
+  $('#bkBtn').onclick = async () => { const n = await createBackup(); if (n) toast(t('backup_done', { f: n })); renderBanner(counts()); };
 }
 // selection
 function enterSelMode(uuid) {

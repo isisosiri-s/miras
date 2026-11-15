@@ -3,7 +3,9 @@
 
 // ---------- saving / picking files ----------
 async function saveFile(name, blob) {
-  if (window.MirasNative && MirasNative.saveFile) return MirasNative.saveFile(name, blob);
+  if (window.MirasNative && MirasNative.saveFile) { // PC: false = user closed the dialog, error = disk full / no access / file busy
+    try { return await MirasNative.saveFile(name, blob); } catch (e) { console.warn('save', e); toast(t('save_fail'), 5000); return false; }
+  }
   const cap = window.Capacitor;
   if (cap && cap.isNativePlatform && cap.isNativePlatform() && cap.Plugins.Filesystem && cap.Plugins.Share) {
     const buf = new Uint8Array(await blob.arrayBuffer());
@@ -84,7 +86,7 @@ function backupPayload() {
 async function createBackup() {
   const text = await sealFile(backupPayload(), DB._pw, H.enc);
   const name = `miras-${fileStamp()}.json`;
-  await saveFile(name, new Blob([text], { type: 'application/json' }));
+  if ((await saveFile(name, new Blob([text], { type: 'application/json' }))) === false) return null; // cancelled or failed: no false "backup done"
   H.lastBackup = Date.now(); await saveHeader();
   return name;
 }
@@ -286,7 +288,7 @@ function syncPayload() {
 async function createSyncFile() {
   const name = `miras-sync-${deviceKind()}-${fileStamp()}.json`;
   const text = await sealFile(syncPayload(), DB._pw, H.enc);
-  await saveFile(name, new Blob([text], { type: 'application/json' }));
+  if ((await saveFile(name, new Blob([text], { type: 'application/json' }))) === false) return null;
   return name;
 }
 function valOf(r, key) { const v = r[key]; return v === undefined || v === null || v === false ? '' : v; }

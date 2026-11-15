@@ -94,7 +94,7 @@ async function moveColumnData(src) {
   const tc = colDef(res.key); const p = plan(tc, res.pol);
   const bk = await ask({ title: t('conf_title'), text: t('col_move_bk', { a: p.todo.length }), buttons: [{ label: t('btn_cancel'), v: null }, { label: t('col_move_nobk'), v: 'no', cls: 'b3' }, { label: t('col_move_bkgo'), v: 'bk', cls: 'b1' }] });
   if (!bk) return false;
-  if (bk === 'bk') { const n = await createBackup(); toast(t('backup_done', { f: n })); }
+  if (bk === 'bk') { const n = await createBackup(); if (n) toast(t('backup_done', { f: n })); }
   for (const [r, v] of p.todo) updateRecord(r, { [tc.key]: v });
   if (res.del && !src.b) deleteColumn(src.key);
   UI.listKey = ''; scheduleSave();
@@ -191,7 +191,7 @@ async function viewSettings(main) {
     if (pin) { await Auth.changePw(pin); if (H.bio) await Native.bioSave(pin); toast(t('pw_ok')); }
   };
   $('#sCols').onclick = () => goRoute('columns'); $('#sTrash').onclick = () => goRoute('trash');
-  $('#sBk').onclick = async () => { const n = await createBackup(); toast(t('backup_done', { f: n })); again(); };
+  $('#sBk').onclick = async () => { const n = await createBackup(); if (n) toast(t('backup_done', { f: n })); again(); };
 }
 
 // ---------- import / export ----------
@@ -202,7 +202,7 @@ function viewIE(main) {
   $('#iImp').onclick = () => startImport();
   const plain = fn => async () => { if (await confirmDlg(t('ie_warn_plain'), t('ok'))) await fn(); };
   $('#iXlsx').onclick = plain(exportXlsx); $('#iCsv').onclick = plain(exportCsv);
-  $('#iBk').onclick = async () => { const n = await createBackup(); toast(t('backup_done', { f: n })); };
+  $('#iBk').onclick = async () => { const n = await createBackup(); if (n) toast(t('backup_done', { f: n })); };
   $('#iRs').onclick = async () => {
     const f = await pickFile('.json,application/json'); if (!f) return;
     const payload = await readFilePayload(await readText(f), 'backup'); if (!payload) return;
@@ -334,7 +334,7 @@ function viewSync(main) {
   if (!S) {
     pageShell(main, t('sync_title'), `<div class="hint">${t('sync_hint')}</div><div style="display:flex;gap:10px;padding:6px 12px"><button class="btn b3" id="syCreate">${t('sync_create')}</button><button class="btn b1" id="syChoose">${t('sync_choose')}</button></div>${lanBlockHtml()}`);
     bindLan(main);
-    $('#syCreate').onclick = async () => { const n = await createSyncFile(); toast(t('sync_created', { f: n }), 4000); };
+    $('#syCreate').onclick = async () => { const n = await createSyncFile(); if (n) toast(t('sync_created', { f: n }), 4000); };
     $('#syChoose').onclick = async () => {
       const f = await pickFile('.json,application/json'); if (!f) return;
       const payload = await readFilePayload(await readText(f), 'sync'); if (!payload) return;
@@ -348,7 +348,7 @@ function viewSync(main) {
   if (S.done) {
     pageShell(main, t('sync_title'), `<div class="empty"><b>${t('sync_done')}</b>${S.renum ? `<div>${t('sync_renum', { n: S.renum })}</div>` : ''}</div>${lanStatsHtml(planStats(P))}
     <div style="display:flex;flex-direction:column;gap:10px;padding:6px 12px">${S.wifi ? '' : `<button class="btn b3" id="syRet">${t('sync_return')}</button>`}<button class="btn b1" id="syBack">${t('nav_books')}</button></div>`);
-    if (!S.wifi) $('#syRet').onclick = async () => { const n = await createSyncFile(); toast(t('sync_created', { f: n }), 4000); };
+    if (!S.wifi) $('#syRet').onclick = async () => { const n = await createSyncFile(); if (n) toast(t('sync_created', { f: n }), 4000); };
     $('#syBack').onclick = () => { UI.sync = null; UI.listKey = ''; goRoute('books'); };
     return;
   }
