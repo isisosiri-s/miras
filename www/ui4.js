@@ -11,24 +11,41 @@ const repBadge = k => (k === 'printed' ? 'l' : k === 'book' ? 'b' : '');
 
 function repBack() {
   const R = UI.rep;
+  if (R.sel) { if (R.selOff) R.selOff(); else R.sel = null; return true; }
   if (R.pick) { R.pick = null; renderRoute(); return true; }
   if (R.m) { R.m = null; renderRoute(); return true; }
   if (R.f) { R.f = null; renderRoute(); return true; }
   return false;
 }
+function repRerender() { const p = $('.page'), y = p ? p.scrollTop : 0; renderRoute(); const q = $('.page'); if (q) q.scrollTop = y; }
 function repLeavesOf(v) { const n = typeof v === 'number' ? v : parseNum(String(v ?? '')); return typeof n === 'number' && isFinite(n) ? n : 0; }
 function repRec(row) { return row.kind !== 'book' && row.inv ? findByInv(row.inv) : null; }
 function repRowTitle(row) { const r = repRec(row); return (r && r.title) || row.title || ''; }
 function repRowScanned(row) { if (row.kind === 'book') return !!row.scanned; const r = repRec(row); return !!(r && r.scanned); }
+// totals for one month or (array) for a whole folder; books always count as scanned
 function repStats(m) {
   const s = { n: 0, l: 0, sn: 0, sl: 0, rest: 0, by: { manuscript: { n: 0, l: 0 }, printed: { n: 0, l: 0 }, book: { n: 0, l: 0 } } };
-  for (const row of m.rows) {
+  for (const mo of (Array.isArray(m) ? m : [m])) for (const row of mo.rows) {
     const l = repLeavesOf(row.leaves); s.n++; s.l += l;
     const b = s.by[row.kind] || s.by.manuscript; b.n++; b.l += l;
-    if (repRowScanned(row)) { s.sn++; s.sl += l; }
+    if (row.kind === 'book' || repRowScanned(row)) { s.sn++; s.sl += l; }
     const r = repRec(row); if (r && r.restored) s.rest++;
   }
   return s;
+}
+function repSearchInv(q) {
+  const k = invKey(q), out = []; if (!k) return { out, more: false };
+  for (const f of DB.reports) for (const m of [...f.months].sort((a, b) => b.m - a.m)) for (const row of m.rows) {
+    if (row.kind === 'book' || !row.inv || !invKey(row.inv).includes(k)) continue;
+    if (out.length >= 100) return { out, more: true };
+    out.push({ f, m, row });
+  }
+  return { out, more: false };
+}
+function repHitsHtml(q) {
+  const { out, more } = repSearchInv(q);
+  if (!out.length) return `<div class="empty">${esc(t('rep_g_none'))}</div>`;
+  return out.map(({ f, m, row }) => `<div class="rp-pr" data-hit="1" data-f="${f.id}" data-m="${m.id}" data-id="${row.id}"><span class="bd ${repBadge(row.kind)}">${esc(repKindLabel(row.kind).slice(0, 5).toUpperCase())}</span><div class="rp-t"><b>${esc(repRowTitle(row)) || '–'}</b><span>${esc(t('rep_inv'))} ${esc(row.inv)} · ${esc(f.name)} · ${esc(repMonthName(m.m))}</span></div><span class="sc ${repRowScanned(row) ? 'y' : 'n'}">✓</span></div>`).join('') + (more ? `<div class="rp-hint">${esc(t('rep_g_more', { n: 100 }))}</div>` : '');
 }
 // where else (another month) is this inventory number already listed?
 function repWhere(inv, exceptMonth) {
@@ -76,13 +93,24 @@ function repNameDlg(title, val) {
 function repViewFolders(main) {
   const rows = DB.reports.map(f => {
     const n = f.months.reduce((a, m) => a + m.rows.length, 0);
-    return `<div class="rp-item" data-f="${f.id}"><span class="rp-ic">📁</span><div class="rp-tx"><div class="n">${esc(f.name)}</div><div class="s">${f.months.length ? t('rep_folder_sub', { m: f.months.length, n }) : t('rep_empty')}</div></div><button class="rp-dots" data-fm="${f.id}" aria-label="…">⋯</button><span class="chev">${IC.chev}</span></div>`;
+    return `<div class="rp-item" data-f="${f.id}"><span class="rp-h" aria-hidden="true">⋮⋮</span><span class="rp-ic">📁</span><div class="rp-tx"><div class="n">${esc(f.name)}</div><div class="s">${f.months.length ? t('rep_folder_sub', { m: f.months.length, n }) : t('rep_empty')}</div></div><button class="rp-dots" data-fm="${f.id}" aria-label="…">⋯</button><span class="chev">${IC.chev}</span></div>`;
   }).join('');
-  repShell(main, t('nav_reports'), `<div class="rp-list">${rows || `<div class="empty"><b>${t('rep_empty')}</b></div>`}</div>`, t('rep_new_folder'), async () => {
+  const R = UI.rep, hasRows = DB.reports.some(f => f.months.some(m => m.rows.length));
+  const listHtml = `<div class="rp-list" id="rpFl">${rows || `<div class="empty"><b>${t('rep_empty')}</b></div>`}</div>`;
+  const inner = `${hasRows ? `<div class="rp-search"><input class="inp" id="rpGQ" type="search" autocomplete="off" placeholder="${esc(t('rep_gsearch'))}" value="${esc(R.gq || '')}"></div>` : ''}<div id="rpGBody">${hasRows && R.gq ? repHitsHtml(R.gq) : listHtml}</div>`;
+  repShell(main, t('nav_reports'), inner, t('rep_new_folder'), async () => {
     const name = await repNameDlg(t('rep_new_folder')); if (!name) return;
     const f = { id: uuid(), name, months: [] }; DB.reports.push(f); scheduleSave(); repEnter({ f: f.id });
   });
+  const body = $('#rpGBody');
+  const bindList = () => { const fl = $('#rpFl'); if (fl) repDrag(fl, '.rp-item', ids => { const by = new Map(DB.reports.map(x => [x.id, x])); const next = ids.map(i => by.get(i)).filter(Boolean); if (next.length === DB.reports.length && next.some((x, i) => x !== DB.reports[i])) { DB.reports = next; scheduleSave(); } }, 'f'); };
+  bindList();
+  const gq = $('#rpGQ');
+  if (gq) { let qt; gq.oninput = () => { clearTimeout(qt); qt = setTimeout(() => { R.gq = gq.value.trim(); body.innerHTML = R.gq ? repHitsHtml(R.gq) : listHtml; bindList(); }, 150); }; }
   $('#pg').onclick = async e => {
+    if (e.target.closest('.rp-h')) return;
+    const hit = e.target.closest('[data-hit]');
+    if (hit) { repEnter({ f: hit.dataset.f, m: hit.dataset.m, hl: hit.dataset.id }); return; }
     const d = e.target.closest('[data-fm]');
     if (d) {
       e.stopPropagation(); const f = repFolder(d.dataset.fm); if (!f) return;
@@ -100,9 +128,11 @@ function repViewMonths(main, f) {
   const ms = [...f.months].sort((a, b) => b.m - a.m);
   const rows = ms.map(m => {
     const s = repStats(m);
-    return `<div class="rp-item" data-m="${m.id}"><span class="rp-ic">📂</span><div class="rp-tx"><div class="n">${esc(repMonthName(m.m))}</div><div class="s">${s.n ? t('rep_month_sub', { n: s.n, l: fmtNum(s.l) }) : t('rep_empty')}</div></div><button class="rp-dots" data-md="${m.id}" aria-label="…">⋯</button><span class="chev">${IC.chev}</span></div>`;
+    return `<div class="rp-item" data-m="${m.id}"><span class="rp-ic">📂</span><div class="rp-tx"><div class="n">${esc(repMonthName(m.m))}</div><div class="s">${s.n ? t('rep_month_sub2', { n: s.n, l: fmtNum(s.l), s: s.sn }) : t('rep_empty')}</div></div><button class="rp-dots" data-md="${m.id}" aria-label="…">⋯</button><span class="chev">${IC.chev}</span></div>`;
   }).join('');
-  repShell(main, f.name, `<div class="rp-list">${rows || `<div class="empty"><b>${t('rep_empty')}</b></div>`}</div>`, t('rep_add_month'), async () => {
+  const fs = repStats(f.months), kc = k => `<div class="rp-c"><div class="l">${esc(t('rep_c_' + k))}</div><div class="v">${fs.by[k].n}</div><div class="s">${fmtNum(fs.by[k].l)} ${esc(t('rep_leaves').toLowerCase())}</div></div>`;
+  const total = f.months.length ? `<div class="rp-cards">${REP_KINDS.map(kc).join('')}</div><div class="rp-tot"><div class="s rp-tt">${esc(t('rep_year_total', { n: f.name }))}</div><div class="r1"><span>${esc(t('rep_total'))} <b>${fs.n}</b></span><span>${esc(t('rep_total_leaves'))} <b>${fmtNum(fs.l)}</b></span></div><div class="s">${esc(t('rep_of_scanned'))}: ${fs.sn} · ${fmtNum(fs.sl)} ${esc(t('rep_leaves').toLowerCase())}</div>${H.rest ? `<div class="s">${esc(t('rep_rest_line'))}: ${fs.rest}</div>` : ''}</div>` : '';
+  repShell(main, f.name, `${total}<div class="rp-list">${rows || `<div class="empty"><b>${t('rep_empty')}</b></div>`}</div>`, t('rep_add_month'), async () => {
     const used = new Set(f.months.map(m => m.m));
     const n = await ask({
       title: t('rep_pick_month'), html: `<div class="rp-months">${Array.from({ length: 12 }, (_, i) => `<button type="button" class="rp-mo" data-mo="${i + 1}" ${used.has(i + 1) ? 'disabled' : ''}>${esc(repMonthName(i + 1))}</button>`).join('')}</div>`,
@@ -129,39 +159,82 @@ function repRowHtml(row) {
   const rec = repRec(row), sc = repRowScanned(row), title = repRowTitle(row);
   const sub = row.kind === 'book' ? t('rep_manual') : (row.inv ? `${t('rep_inv')} ${esc(row.inv)}${rec ? '' : ` · ${t('rep_not_in_archive')}`}` : '');
   const lv = row.leaves === '' || row.leaves == null ? '–' : fmtNum(repLeavesOf(row.leaves));
-  return `<div class="rp-row" data-id="${row.id}"><span class="rp-h" aria-hidden="true">⋮⋮</span><span class="bd ${repBadge(row.kind)}">${esc(repKindLabel(row.kind).slice(0, 5).toUpperCase())}</span><div class="rp-t"><b>${esc(title) || '–'}</b><span>${sub}</span></div><div class="rp-q">${lv}<i>${esc(t('rep_leaves').toLowerCase())}</i></div><span class="sc ${sc ? 'y' : 'n'}">✓</span></div>`;
+  return `<div class="rp-row" data-id="${row.id}"><span class="rp-h" aria-hidden="true">⋮⋮</span><span class="chk">✓</span><span class="bd ${repBadge(row.kind)}">${esc(repKindLabel(row.kind).slice(0, 5).toUpperCase())}</span><div class="rp-t"><b>${esc(title) || '–'}</b><span>${sub}</span></div><div class="rp-q">${lv}<i>${esc(t('rep_leaves').toLowerCase())}</i></div><span class="sc ${sc ? 'y' : 'n'}">✓</span></div>`;
 }
 function repViewMonth(main, f, m) {
+  const R = UI.rep; R.sel = null; R.selOff = null;
   const s = repStats(m);
   const card = k => `<div class="rp-c"><div class="l">${esc(t('rep_c_' + k))}</div><div class="v">${s.by[k].n}</div><div class="s">${fmtNum(s.by[k].l)} ${esc(t('rep_leaves').toLowerCase())}</div></div>`;
   const inner = `<div class="rp-cards">${REP_KINDS.map(card).join('')}</div>
     <div class="rp-tot"><div class="r1"><span>${esc(t('rep_total'))} <b>${s.n}</b></span><span>${esc(t('rep_total_leaves'))} <b>${fmtNum(s.l)}</b></span></div>
       <div class="s">${esc(t('rep_of_scanned'))}: ${s.sn} · ${fmtNum(s.sl)} ${esc(t('rep_leaves').toLowerCase())}</div>${H.rest ? `<div class="s">${esc(t('rep_rest_line'))}: ${s.rest}</div>` : ''}</div>
-    <div class="rp-tools"><button class="btn b2" id="rpSort">⇅ ${esc(t('rep_sort_type'))}</button><button class="btn b1" id="rpArc">+ ${esc(t('rep_from_archive'))}</button></div>
-    <div id="rpRows">${m.rows.length ? m.rows.map(repRowHtml).join('') : `<div class="empty">${esc(t('rep_list_empty'))}</div>`}</div>`;
+    <div class="rp-tools"><button class="btn b2" id="rpSort">⇅ ${esc(t('rep_sort_type'))}</button><button class="btn b2" id="rpSel">☑ ${esc(t('rep_select'))}</button><button class="btn b1" id="rpArc">+ ${esc(t('rep_from_archive'))}</button></div>
+    <div id="rpRows">${m.rows.length ? m.rows.map(repRowHtml).join('') : `<div class="empty">${esc(t('rep_list_empty'))}</div>`}</div>
+    <div class="rp-bar hidden" id="rpSelBar"><button class="btn b2" id="rpSCancel">${esc(t('btn_cancel'))}</button><button class="btn b2" id="rpSAll"></button><button class="btn bad" id="rpSDel"></button></div>`;
   repShell(main, `${f.name} · ${repMonthName(m.m)}`, inner, t('rep_add'), () => repRowDlg(m, null), true);
   $('#rpArc').onclick = () => { UI.rep.pick = { sel: new Set(), q: '' }; renderRoute(); animRoute(); const p = $('.page'); if (p) p.scrollTop = 0; };
-  $('#rpSort').onclick = () => { m.rows = m.rows.map((r, i) => [r, i]).sort((a, b) => REP_KINDS.indexOf(a[0].kind) - REP_KINDS.indexOf(b[0].kind) || a[1] - b[1]).map(x => x[0]); scheduleSave(); renderRoute(); };
-  const box = $('#rpRows');
+  $('#rpSort').onclick = () => { m.rows = m.rows.map((r, i) => [r, i]).sort((a, b) => REP_KINDS.indexOf(a[0].kind) - REP_KINDS.indexOf(b[0].kind) || a[1] - b[1]).map(x => x[0]); scheduleSave(); repRerender(); };
+  const box = $('#rpRows'), bar = $('#rpSelBar');
+  // selection mode (in place, so the scroll position stays)
+  const syncSel = () => {
+    const on = !!R.sel;
+    box.classList.toggle('sel', on); bar.classList.toggle('hidden', !on);
+    const fab = $('#rpFab'); if (fab) fab.classList.toggle('hidden', on);
+    const aw = $('#rpAddW'); if (aw) aw.classList.toggle('hidden', on);
+    if (!on) return;
+    $$('.rp-row', box).forEach(el => { const c = R.sel.has(el.dataset.id); el.classList.toggle('on', c); el.querySelector('.chk').classList.toggle('on', c); });
+    $('#rpSAll').textContent = R.sel.size && R.sel.size === m.rows.length ? t('rep_sel_none') : t('rep_sel_all');
+    $('#rpSDel').textContent = t('rep_del_n', { n: R.sel.size }); $('#rpSDel').disabled = !R.sel.size;
+  };
+  R.selOff = () => { R.sel = null; syncSel(); };
+  $('#rpSel').onclick = () => { if (!m.rows.length) return; R.sel = new Set(); syncSel(); };
+  $('#rpSCancel').onclick = () => history.back();
+  $('#rpSAll').onclick = () => { R.sel = R.sel.size === m.rows.length ? new Set() : new Set(m.rows.map(r => r.id)); syncSel(); };
+  $('#rpSDel').onclick = async () => {
+    const n = R.sel.size; if (!n) return;
+    if (!(await confirmDlg(t('rep_del_rows', { n }), t('btn_delete'), true))) return;
+    const del = R.sel; m.rows = m.rows.filter(r => !del.has(r.id)); R.sel = null; R.selOff = null; scheduleSave(); repRerender();
+  };
+  let lp = null, swallow = false;
+  box.addEventListener('pointerdown', e => {
+    if (e.target.closest('.rp-h') || R.sel) return;
+    const r = e.target.closest('.rp-row'); if (!r) return;
+    const x0 = e.clientX, y0 = e.clientY;
+    const stop = () => { clearTimeout(lp); lp = null; box.removeEventListener('pointermove', mv); box.removeEventListener('pointerup', stop); box.removeEventListener('pointercancel', stop); };
+    const mv = ev => { if (Math.abs(ev.clientX - x0) > 10 || Math.abs(ev.clientY - y0) > 10) stop(); };
+    box.addEventListener('pointermove', mv); box.addEventListener('pointerup', stop); box.addEventListener('pointercancel', stop);
+    lp = setTimeout(() => { stop(); swallow = true; setTimeout(() => { swallow = false; }, 700); R.sel = new Set([r.dataset.id]); syncSel(); if (navigator.vibrate) try { navigator.vibrate(15); } catch (_) {} }, 450);
+  });
+  box.addEventListener('contextmenu', e => e.preventDefault());
   box.addEventListener('click', e => {
     if (e.target.closest('.rp-h')) return;
+    if (swallow) { swallow = false; return; }
     const r = e.target.closest('.rp-row'); if (!r) return;
+    if (R.sel) { const id = r.dataset.id; if (R.sel.has(id)) R.sel.delete(id); else R.sel.add(id); syncSel(); return; }
     const row = m.rows.find(x => x.id === r.dataset.id); if (row) repRowDlg(m, row);
   });
-  repBindDrag(box, m);
+  repDrag(box, '.rp-row', ids => {
+    const by = new Map(m.rows.map(r => [r.id, r])), next = ids.map(i => by.get(i)).filter(Boolean);
+    if (next.length === m.rows.length && next.some((r, i) => r !== m.rows[i])) { m.rows = next; scheduleSave(); }
+  });
+  if (R.hl) {
+    const el = $(`.rp-row[data-id="${R.hl}"]`, box); R.hl = null;
+    if (el) setTimeout(() => { el.scrollIntoView({ block: 'center' }); el.classList.add('hl'); setTimeout(() => el.classList.remove('hl'), 2200); }, 60);
+  }
 }
 
-// drag a row by its handle
-function repBindDrag(box, m) {
+// drag an item (row or folder) by its handle; onDone gets the new id order
+function repDrag(box, sel, onDone, idKey) {
+  const key = idKey || 'id';
   box.addEventListener('pointerdown', e => {
     const h = e.target.closest('.rp-h'); if (!h) return;
-    const row = h.closest('.rp-row'); e.preventDefault();
+    const row = h.closest(sel); if (!row) return; e.preventDefault();
     h.setPointerCapture(e.pointerId); row.classList.add('drag');
     const scroller = $('.page'); let y0 = e.clientY, lastY = e.clientY, raf = 0;
     const place = () => {
       const dy = lastY - y0; row.style.transform = `translateY(${dy}px)`;
       const rect = row.getBoundingClientRect(), mid = rect.top + rect.height / 2;
-      for (const o of box.querySelectorAll('.rp-row')) {
+      for (const o of box.querySelectorAll(sel)) {
         if (o === row) continue; const b = o.getBoundingClientRect();
         if (mid > b.top && mid < b.bottom) {
           row.style.transform = ''; const t0 = row.getBoundingClientRect().top;
@@ -179,10 +252,7 @@ function repBindDrag(box, m) {
     const up = () => {
       h.removeEventListener('pointermove', mv); h.removeEventListener('pointerup', up); h.removeEventListener('pointercancel', up);
       cancelAnimationFrame(raf); row.classList.remove('drag'); row.style.transform = '';
-      const order = [...box.querySelectorAll('.rp-row')].map(x => x.dataset.id);
-      const by = new Map(m.rows.map(r => [r.id, r]));
-      const next = order.map(id => by.get(id)).filter(Boolean);
-      if (next.length === m.rows.length && next.some((r, i) => r !== m.rows[i])) { m.rows = next; scheduleSave(); }
+      onDone([...box.querySelectorAll(sel)].map(x => x.dataset[key]));
     };
     h.addEventListener('pointermove', mv); h.addEventListener('pointerup', up); h.addEventListener('pointercancel', up);
   });
@@ -236,7 +306,7 @@ function repRowDlg(m, row) {
   if (row) buttons.push({ label: t('btn_delete'), v: 'del', cls: 'bad' });
   else buttons.push({ label: t('rep_add_more'), cls: 'b3', keep: true, onClick: async mb => {
     const v = await prepare(mb); if (!v) return;
-    m.rows.push({ id: uuid(), ...v }); scheduleSave(); renderRoute();
+    m.rows.push({ id: uuid(), ...v }); scheduleSave(); repRerender();
     $('#rpInv', mb).value = ''; $('#rpTitle', mb).value = ''; $('#rpLeaves', mb).value = ''; st.userKind = false; st.userLeaves = false; sync(mb); $('#rpInv', mb).focus();
   } });
   buttons.push({ label: row ? t('rep_save') : t('rep_add_btn'), cls: 'b1', check: async mb => { const v = await prepare(mb); if (!v) return false; mb._v = v; return true; }, v: mb => mb._v });
@@ -250,10 +320,10 @@ function repRowDlg(m, row) {
       sync(mb);
     },
   }).then(async v => {
-    if (v === 'del') { if (await confirmDlg(t('rep_del_row'), t('btn_delete'), true)) { m.rows = m.rows.filter(r => r !== row); scheduleSave(); renderRoute(); } return; }
+    if (v === 'del') { if (await confirmDlg(t('rep_del_row'), t('btn_delete'), true)) { m.rows = m.rows.filter(r => r !== row); scheduleSave(); repRerender(); } return; }
     if (!v || typeof v !== 'object') return;
     if (row) Object.assign(row, v); else m.rows.push({ id: uuid(), ...v });
-    scheduleSave(); renderRoute();
+    scheduleSave(); repRerender();
   });
 }
 

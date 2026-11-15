@@ -327,3 +327,17 @@ select.inp{appearance:auto}
   .rp-tot{margin-bottom:6px;padding:5px 10px}.rp-tools .btn{height:36px}
   .rp-item{padding:8px 10px;margin-bottom:6px}
 }
+
+/* 1.1.24 reports: reorder folders, select rows, search */
+.rp-item .rp-h{width:22px;margin-left:-6px}
+.rp-item.drag{position:relative;z-index:8;box-shadow:0 6px 18px rgba(0,0,0,.28);opacity:.97}
+.rp-row,.rp-item{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.rp-row .chk{display:none}
+#rpRows.sel .rp-h{display:none}#rpRows.sel .chk{display:flex}
+.rp-row.on{background:var(--row-sel)}
+.rp-row.hl{animation:rphl 2.2s ease-out}
+@keyframes rphl{0%,60%{background:var(--row-sel);box-shadow:0 0 0 2px var(--accent)}100%{box-shadow:0 0 0 0 transparent}}
+.rp-tools{flex-wrap:wrap}.rp-tools .btn{flex:1 1 30%;min-width:0;padding:0 6px}
+@media(max-width:700px){#rpArc{flex:1 1 100%}}
+.rp-tt{margin:0 0 4px!important;font-weight:600;color:var(--text)!important;font-size:.8rem!important}
+#rpSelBar .btn{padding:0 6px;font-size:.85rem}#rpSelBar .btn:disabled{opacity:.4}
