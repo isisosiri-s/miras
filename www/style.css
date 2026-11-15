@@ -265,5 +265,18 @@ select.inp{appearance:auto}
 .sthumb{position:absolute;right:3px;top:0;width:7px;border-radius:4px;background:var(--accent);opacity:.5;transition:width .12s,opacity .12s}
 .srail.on .sthumb{width:14px;opacity:.95}
 @media (orientation:landscape) and (max-height:520px){
-  .hdrhide>.appbar.mob,.hdrhide>.toolbar,.hdrhide>#banner,.hdrhide>.counter,.hdrhide>.prog{display:none}
+  /* phone in landscape: compact top block that folds away smoothly while scrolling */
+  .main>.appbar.mob,.main>.toolbar,.main>#banner,.main>.counter,.main>.prog{max-height:160px;overflow:hidden;transition:max-height .24s ease,opacity .18s ease,padding .24s ease,margin .24s ease}
+  .main>.appbar.mob{height:auto;min-height:0;max-height:44px}
+  .main>.appbar.mob>*{transform:scale(.85)}
+  .main>.toolbar{padding:4px 12px 2px;gap:4px}
+  .main>.toolbar .search input,.main>.toolbar .sbtn{height:36px}.main>.toolbar .search svg{top:8px}
+  .main>.toolbar .chip{height:30px}
+  .main>#banner,.main>.counter,.main>.prog{display:none}
+  .hdrhide>.appbar.mob,.hdrhide>.toolbar{max-height:0;opacity:0;padding-top:0;padding-bottom:0;margin:0;border:0}
+  .selbar{min-height:42px;margin-bottom:4px;flex-wrap:nowrap;overflow-x:auto;padding:4px 8px}
+  .selbar .sb{height:30px;flex:none}
+  .th{height:32px}
 }
+.selbar .sb:first-child{padding:0 8px;margin-left:-6px}
+.fab.hidden{display:none}

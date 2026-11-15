@@ -479,8 +479,8 @@ function onListScroll() {
     // phone in landscape: header, search, chips, banner and counter fold away while the list is scrolled
     if (tw && matchMedia(LAND_SHORT).matches) {
       const p = tw.parentElement, hid = p.classList.contains('hdrhide'), st = tw.scrollTop;
-      if (!hid && st > 60) { p.classList.add('hdrhide'); v.from = -1; }
-      else if (hid && st < 8) { p.classList.remove('hdrhide'); v.from = -1; }
+      if (!hid && st > 24) p.classList.add('hdrhide');
+      else if (hid && st < 4) p.classList.remove('hdrhide');
     }
     renderWindow(false); updateRail();
   });
@@ -492,7 +492,7 @@ function updateRail() {
   const max = tw.scrollHeight - tw.clientHeight;
   const show = railOn() && max > tw.clientHeight * 1.5;
   r.style.display = show ? 'block' : 'none'; if (!show) return;
-  const hh = 38, rh = tw.clientHeight - hh, thH = 48;
+  const hh = ($('#th') || {}).offsetHeight || 38, rh = tw.clientHeight - hh, thH = 48;
   r.style.top = (tw.offsetTop + hh) + 'px'; r.style.height = rh + 'px';
   th.style.height = thH + 'px'; th.style.transform = `translateY(${Math.max(0, Math.min(1, tw.scrollTop / max)) * (rh - thH)}px)`;
 }
@@ -511,6 +511,8 @@ function bindRail() {
     tw.scrollTop = j.dataset.jump === 'end' ? tw.scrollHeight : 0;
   });
   window.addEventListener('resize', updateRail);
+  // after the header folds/unfolds the list area changes height: redraw the visible rows
+  const m = tw.parentElement; m.addEventListener('transitionend', e => { if (e.target.parentElement === m && e.propertyName === 'max-height') { UI.vr.from = -1; renderWindow(true); updateRail(); } });
 }
 
 // ---- column header menu: sort, filter, auto width, hide ----
@@ -620,14 +622,14 @@ function onRowClick(e) {
 }
 function renderSelbar() {
   const s = $('#selbar'); if (!s) return;
+  const fab = $('#fab'); if (fab) fab.classList.toggle('hidden', !!(UI.sel.size || UI.selMode));
   if (!UI.sel.size && !UI.selMode) { s.classList.add('hidden'); return; }
   s.classList.remove('hidden');
-  s.innerHTML = `<span>${t('sel_count', { n: UI.sel.size })}</span>
+  s.innerHTML = `<button class="sb" id="sbX" aria-label="${esc(t('close'))}">${IC.close}</button><span>${t('sel_count', { n: UI.sel.size })}</span>
     <button class="sb" id="sbAll">${t('sel_all')}</button>
     <button class="sb" id="sbMark">${IC.ok(14, '#fff')}&nbsp;${t('sel_mark')}</button>
     <button class="sb" id="sbChg">${t('sel_change')}</button>
-    <button class="sb del" id="sbDel">${t('btn_delete')}</button>
-    <button class="sb" id="sbX" aria-label="${esc(t('close'))}">${IC.close}</button>`;
+    <button class="sb del" id="sbDel">${t('btn_delete')}</button>`;
   $('#sbAll').onclick = () => { computeList().forEach(r => UI.sel.add(r.uuid)); UI.selMode = true; refreshList(); };
   $('#sbX').onclick = () => clearSel();
   $('#sbMark').onclick = () => { const rs = selRecords().filter(r => !r.scanned); rs.forEach(r => updateRecord(r, { scanned: true })); toast(t('mass_done', { n: rs.length })); clearSel(); };
