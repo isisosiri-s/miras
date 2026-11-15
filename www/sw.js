@@ -1,5 +1,5 @@
 /* Miras service worker: web/PWA only. Network-first so a new version is never hidden by an old cache. */
-const V = 'miras-' + '1.1.21';
+const V = 'miras-' + '1.1.22';
 const FILES = ['./', 'index.html', 'style.css', 'i18n.js', 'core.js', 'io.js', 'native.js', 'ui.js', 'ui2.js', 'ui3.js', 'app.js', 'vendor/xlsx.full.min.js', 'manifest.json', 'icon.svg', 'icon-192.png', 'icon-512.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(V).then(c => Promise.all(FILES.map(f => c.add(new Request(f, { cache: 'reload' })).catch(() => { })))).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(k => Promise.all(k.filter(x => x !== V).map(x => caches.delete(x)))).then(() => self.clients.claim())); });

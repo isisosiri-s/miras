@@ -280,3 +280,7 @@ select.inp{appearance:auto}
 }
 .selbar .sb:first-child{padding:0 8px;margin-left:-6px}
 .fab.hidden{display:none}
+
+/* 1.1.22: lists inside dialogs scroll; buttons stay put */
+.modal>.group{flex:0 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+.modal>.btns,.modal>h3{flex:none}
