@@ -479,8 +479,9 @@ function onListScroll() {
     // phone in landscape: header, search, chips, banner and counter fold away while the list is scrolled
     if (tw && matchMedia(LAND_SHORT).matches) {
       const p = tw.parentElement, hid = p.classList.contains('hdrhide'), st = tw.scrollTop;
-      if (!hid && st > 24) p.classList.add('hdrhide');
-      else if (hid && st < 4) p.classList.remove('hdrhide');
+      // one layout change per fold/unfold (no per-frame animation of heights); keep the visible rows anchored
+      if (!hid && st > 24) { p.classList.add('hdrhide'); v.from = -1; }
+      else if (hid && st < 4) { p.classList.remove('hdrhide'); v.from = -1; }
     }
     renderWindow(false); updateRail();
   });
@@ -512,7 +513,6 @@ function bindRail() {
   });
   window.addEventListener('resize', updateRail);
   // after the header folds/unfolds the list area changes height: redraw the visible rows
-  const m = tw.parentElement; m.addEventListener('transitionend', e => { if (e.target.parentElement === m && e.propertyName === 'max-height') { UI.vr.from = -1; renderWindow(true); updateRail(); } });
 }
 
 // ---- column header menu: sort, filter, auto width, hide ----

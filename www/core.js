@@ -1,6 +1,6 @@
 'use strict';
 /* Miras core: i18n, utils, crypto, storage, data model */
-const APP_VERSION = '1.1.20';
+const APP_VERSION = '1.1.21';
 const PBKDF_ITER = 250000;
 const TRASH_DAYS = 30;
 
