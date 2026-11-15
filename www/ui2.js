@@ -44,14 +44,62 @@ function viewColumns(main) {
     else if (a === 'edit') { await colDialog(c); }
     else if (a === 'del') {
       for (; ;) {
-        const r = await ask({ title: t('col_del_title', { x: colName(c) }), text: t('col_del_text'), buttons: [{ label: t('col_del_export'), v: 'export', cls: 'b3' }, { label: t('btn_cancel'), v: null }, { label: t('col_del_ok'), v: 'del', cls: 'bad' }] });
+        const r = await ask({ title: t('col_del_title', { x: colName(c) }), text: t('col_del_text'), buttons: [{ label: t('col_move_btn'), v: 'move', cls: 'b1' }, { label: t('col_rename_btn'), v: 'rename', cls: 'b3' }, { label: t('col_del_export'), v: 'export', cls: 'b3' }, { label: t('btn_cancel'), v: null }, { label: t('col_del_ok'), v: 'del', cls: 'bad' }] });
         if (r === 'export') { await exportColumnXlsx(key); continue; }
+        if (r === 'rename') { await colDialog(c); break; }
+        if (r === 'move') { if (await moveColumnData(c)) break; continue; }
         if (r === 'del') { deleteColumn(key); UI.listKey = ''; }
         break;
       }
     }
     viewColumns(main);
   });
+}
+// move the data of one column into another (optionally deleting the source column afterwards)
+async function moveColumnData(src) {
+  const srcOk = ['text', 'number', 'date', 'list'].includes(src.kind);
+  const targets = liveCols().filter(c => c.key !== src.key && c.kind === 'text' && c.key !== 'inv');
+  if (!srcOk || !targets.length) { toast(t('col_move_none')); return false; }
+  const recs = DB.records.filter(r => !r.purged);
+  const val = (c, r) => String(cellText(c, r) ?? '').trim();
+  const plan = (tc, pol) => {
+    let move = 0, conf = 0; const todo = [];
+    for (const r of recs) {
+      const v = val(src, r); if (!v) continue;
+      const cur = String(r[tc.key] ?? '').trim();
+      if (!cur) { todo.push([r, v]); move++; }
+      else if (norm(cur) === norm(v)) { /* already same */ }
+      else {
+        conf++;
+        if (pol === 'replace') todo.push([r, v]);
+        else if (pol === 'join') todo.push([r, cur + ' / ' + v]);
+      }
+    }
+    return { move, conf, todo };
+  };
+  const tgtDef = targets.find(c => c.key === 'author') || targets[0];
+  const res = await ask({
+    title: t('col_move_title', { x: colName(src) }),
+    html: `<div class="fld"><div class="lbl">${t('col_move_to')}</div><select class="inp" id="mvT">${targets.map(c => `<option value="${c.key}" ${c.key === tgtDef.key ? 'selected' : ''}>${esc(colName(c))}</option>`).join('')}</select></div>
+      <div class="fld"><div class="lbl">${t('col_move_conf')}</div><select class="inp" id="mvP"><option value="keep">${t('col_move_keep')}</option><option value="replace">${t('col_move_replace')}</option><option value="join">${t('col_move_join')}</option></select></div>
+      <label class="setrow" style="padding:8px 0"><input type="checkbox" id="mvD" checked style="margin-right:10px"><span class="tt">${t('col_move_del', { x: esc(colName(src)) })}</span></label>
+      <div class="hint" id="mvI" style="padding:4px 0"></div>`,
+    onMount: m => {
+      const upd = () => { const p = plan(colDef($('#mvT', m).value), $('#mvP', m).value); $('#mvI', m).textContent = t('col_move_info', { a: p.move, b: p.conf }); };
+      $('#mvT', m).onchange = upd; $('#mvP', m).onchange = upd; upd();
+    },
+    buttons: [{ label: t('btn_cancel'), v: null }, { label: t('col_move_go'), cls: 'b1', v: m => ({ key: $('#mvT', m).value, pol: $('#mvP', m).value, del: $('#mvD', m).checked }) }]
+  });
+  if (!res) return false;
+  const tc = colDef(res.key); const p = plan(tc, res.pol);
+  const bk = await ask({ title: t('conf_title'), text: t('col_move_bk', { a: p.todo.length }), buttons: [{ label: t('btn_cancel'), v: null }, { label: t('col_move_nobk'), v: 'no', cls: 'b3' }, { label: t('col_move_bkgo'), v: 'bk', cls: 'b1' }] });
+  if (!bk) return false;
+  if (bk === 'bk') { const n = await createBackup(); toast(t('backup_done', { f: n })); }
+  for (const [r, v] of p.todo) updateRecord(r, { [tc.key]: v });
+  if (res.del && !src.b) deleteColumn(src.key);
+  UI.listKey = ''; scheduleSave();
+  toast(t('col_move_done', { n: p.todo.length }), 2500);
+  return true;
 }
 async function colDialog(def) {
   const isNew = !def; let kind = def ? def.kind : 'text';
