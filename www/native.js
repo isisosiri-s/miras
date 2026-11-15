@@ -27,7 +27,18 @@ const Native = {
   async bioClear() { try { const p = this.plugin('NativeBiometric'); if (p) await p.deleteCredentials({ server: 'miras.local' }); } catch { } },
   async hasBioCreds() { try { const p = this.plugin('NativeBiometric'); if (!p) return false; await p.getCredentials({ server: 'miras.local' }); return true; } catch { return false; } },
   // status bar: light icons on our dark brown bar
-  async initBars() { const p = this.plugin('StatusBar'); if (p) { try { await p.setStyle({ style: 'DARK' }); } catch (e) { console.warn('sb', e); } } },
+  // icon colour follows what is under the bar: dark screens (lock/splash/dark theme) -> light icons, light theme -> dark icons
+  async syncBar() {
+    const p = this.plugin('StatusBar'); if (!p) return;
+    const light = !!document.querySelector('.lockscr, #splash:not(.out)') || (typeof H !== 'undefined' && H.theme === 'dark');
+    if (light === this._barLight) return; this._barLight = light;
+    try { await p.setStyle({ style: light ? 'DARK' : 'LIGHT' }); } catch (e) { console.warn('sb', e); }
+  },
+  initBars() {
+    this._barLight = null; this.syncBar();
+    let q = 0; const run = () => { q = 0; this.syncBar(); };
+    new MutationObserver(() => { if (!q) q = requestAnimationFrame(run); }).observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'data-theme'] });
+  },
   // back button / minimise
   minimize() { const p = this.plugin('App'); if (p && p.minimizeApp) p.minimizeApp(); },
   onBackButton(fn) { const p = this.plugin('App'); if (p && p.addListener) p.addListener('backButton', fn); },

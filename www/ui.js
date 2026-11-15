@@ -396,7 +396,7 @@ function rowHtml(r, cols, tpl) {
     if (c.kind === 'id') return `<span class="idc${stk(SL, 'id')}">${r.id}</span>`;
     if (c.kind === 'check') return `<span class="mid">${r[c.key] ? IC.ok(20) : IC.no(20)}</span>`;
     if (c.kind === 'number') return `<span class="num">${esc(cellText(c, r))}</span>`;
-    return `<span class="${c.key === 'inv' ? 'inv' + stk(SL, 'inv') : ''}">${esc(cellText(c, r))}</span>`;
+    return `<span class="${c.key === 'inv' ? 'inv' + stk(SL, 'inv') : 'tx'}">${esc(cellText(c, r))}</span>`;
   }).join('');
   const cur = UI.card && UI.card.uuid === r.uuid ? ' cur' : '';
   return `<div class="tr${sel ? ' sel' : ''}${cur}" data-u="${r.uuid}" style="grid-template-columns:${tpl}">${cb}${cells}</div>`;
