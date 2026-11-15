@@ -34,41 +34,52 @@ if (!g.includes('MIRAS_SIGNING')) {
   g += `\n// MIRAS_SIGNING\nandroid {\n    signingConfigs {\n        debug {\n            storeFile file("${'$'}{System.getProperty('user.home')}/.android/debug.keystore")\n            storePassword 'android'\n            keyAlias 'androiddebugkey'\n            keyPassword 'android'\n        }\n    }\n}\n`;
   fs.writeFileSync(gp, g);
 }
-// 5) MainActivity: JS bridge to colour the areas behind the status / navigation bars (top colour, bottom colour)
+// 5) native plugin MirasBars: colour the areas behind the status / navigation bars (top colour, bottom colour)
 {
-  const dir = 'android/app/src/main/java/app/miras/archive', f = dir + '/MainActivity.java';
+  const dir = 'android/app/src/main/java/app/miras/archive';
   fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(f, `package app.miras.archive;
+  fs.writeFileSync(dir + '/MirasBarsPlugin.java', `package app.miras.archive;
 
 import android.graphics.Color;
-import android.graphics.drawable.GradientDrawable;
-import android.graphics.drawable.LayerDrawable;
 import android.graphics.drawable.ColorDrawable;
+import android.graphics.drawable.Drawable;
+import android.graphics.drawable.LayerDrawable;
 import android.view.Gravity;
-import android.webkit.JavascriptInterface;
+import com.getcapacitor.Plugin;
+import com.getcapacitor.PluginCall;
+import com.getcapacitor.PluginMethod;
+import com.getcapacitor.annotation.CapacitorPlugin;
+
+@CapacitorPlugin(name = "MirasBars")
+public class MirasBarsPlugin extends Plugin {
+    @PluginMethod
+    public void set(final PluginCall call) {
+        final String top = call.getString("top", "#5B3A1E");
+        final String bottom = call.getString("bottom", "#F6F1E9");
+        getActivity().runOnUiThread(new Runnable() { public void run() {
+            try {
+                int t = Color.parseColor(top), b = Color.parseColor(bottom);
+                int h = getActivity().getResources().getDisplayMetrics().heightPixels;
+                LayerDrawable ld = new LayerDrawable(new Drawable[] { new ColorDrawable(b), new ColorDrawable(t) });
+                ld.setLayerGravity(1, Gravity.TOP);
+                ld.setLayerHeight(1, h / 2);
+                getActivity().getWindow().getDecorView().setBackground(ld);
+                call.resolve();
+            } catch (Exception e) { call.reject(String.valueOf(e)); }
+        } });
+    }
+}
+`);
+  fs.writeFileSync(dir + '/MainActivity.java', `package app.miras.archive;
+
+import android.os.Bundle;
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
     @Override
-    public void onStart() {
-        super.onStart();
-        if (getBridge() == null || getBridge().getWebView() == null) return;
-        getBridge().getWebView().addJavascriptInterface(new Object() {
-            @JavascriptInterface
-            public void set(final String top, final String bottom) {
-                runOnUiThread(new Runnable() { public void run() {
-                    try {
-                        int t = Color.parseColor(top), b = Color.parseColor(bottom);
-                        int h = getResources().getDisplayMetrics().heightPixels;
-                        ColorDrawable cb = new ColorDrawable(b), ct = new ColorDrawable(t);
-                        LayerDrawable ld = new LayerDrawable(new android.graphics.drawable.Drawable[] { cb, ct });
-                        ld.setLayerGravity(1, Gravity.TOP);
-                        ld.setLayerHeight(1, h / 2);
-                        getWindow().getDecorView().setBackground(ld);
-                    } catch (Exception e) { }
-                } });
-            }
-        }, "MirasBars");
+    public void onCreate(Bundle savedInstanceState) {
+        registerPlugin(MirasBarsPlugin.class);
+        super.onCreate(savedInstanceState);
     }
 }
 `);

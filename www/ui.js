@@ -214,10 +214,12 @@ async function showLock() {
   pad = mountPad(el, { fixed: H.pinLen, onDone: submit });
   refresh(); _lockTimer = setInterval(refresh, 1000);
   if ($('#bio')) $('#bio').onclick = async () => {
-    const p = await Native.bioGet(); if (!p) return;
+    if (UI.bioBusy) return; UI.bioBusy = true;
+    let p = null; try { p = await Native.bioGet(); } finally { setTimeout(() => { UI.bioBusy = false; }, 800); }
+    if (!p) return;
     const r = await Auth.unlock(p); if (r.ok) { clearInterval(_lockTimer); afterUnlock(); } else { await Native.bioClear(); H.bio = false; await saveHeader(); showLock(); }
   };
-  if (bioOk && !UI.noAutoBio) { UI.noAutoBio = true; setTimeout(() => $('#bio') && $('#bio').click(), 300); }
+  if (bioOk && Date.now() - (UI.lastAutoBio || 0) > 4000) { UI.lastAutoBio = Date.now(); setTimeout(() => $('#bio') && $('#bio').click(), 350); }
 }
 function showSetup() {
   const el = appEl();

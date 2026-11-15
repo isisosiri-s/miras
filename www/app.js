@@ -2,7 +2,6 @@
 /* Miras boot, auto-lock, privacy cover, service worker */
 
 async function afterUnlock() {
-  UI.noAutoBio = true;
   await Native.setShotBlock(H.shot);
   mountShell();
   history.replaceState({ root: 1 }, '');
