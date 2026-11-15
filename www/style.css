@@ -254,3 +254,16 @@ select.inp{appearance:auto}
 .th>span[data-k]{cursor:pointer}
 .th>span.flt>i::before{content:'\25CF  ';color:var(--accent)}
 .chip.clr{color:var(--bad)}
+
+/* 1.1.19 */
+.modal .btns.stack{flex-direction:column}
+.modal .btns.stack .btn{flex:none;width:100%;height:auto;min-height:48px;padding:10px 14px;white-space:normal;line-height:1.2}
+.actions .btn{height:56px;font-size:.82rem;line-height:1.15;padding:0 8px;white-space:normal}
+.counter .jmp{height:26px;padding:0 10px;border-radius:13px;background:var(--chip);color:var(--text);font-size:.74rem;font-weight:600}
+.counter .pct+.jmp{margin-left:6px}
+.srail{position:absolute;right:0;width:28px;display:none;touch-action:none;z-index:6}
+.sthumb{position:absolute;right:3px;top:0;width:7px;border-radius:4px;background:var(--accent);opacity:.5;transition:width .12s,opacity .12s}
+.srail.on .sthumb{width:14px;opacity:.95}
+@media (orientation:landscape) and (max-height:520px){
+  .hdrhide>.appbar.mob,.hdrhide>.toolbar,.hdrhide>#banner,.hdrhide>.counter,.hdrhide>.prog{display:none}
+}

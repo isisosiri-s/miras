@@ -51,7 +51,7 @@ const Native = {
   initBars() {
     this._barLight = null; this.syncBar(); this.paintBars();
     let q = 0; const run = () => { q = 0; this.syncBar(); this.paintBars(); };
-    new MutationObserver(() => { if (!q) q = requestAnimationFrame(run); }).observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'data-theme'] });
+    new MutationObserver(ms => { if (ms.every(m => m.target.closest && m.target.closest('#pdots'))) return; if (!q) q = requestAnimationFrame(run); }).observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'data-theme'] });
   },
   // back button / minimise
   minimize() { const p = this.plugin('App'); if (p && p.minimizeApp) p.minimizeApp(); },

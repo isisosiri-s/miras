@@ -8,7 +8,13 @@ async function saveFile(name, blob) {
   if (cap && cap.isNativePlatform && cap.isNativePlatform() && cap.Plugins.Filesystem && cap.Plugins.Share) {
     const buf = new Uint8Array(await blob.arrayBuffer());
     const res = await cap.Plugins.Filesystem.writeFile({ path: name, data: toB64(buf), directory: 'CACHE' });
-    await cap.Plugins.Share.share({ title: name, url: res.uri, dialogTitle: name });
+    const how = await ask({ title: name, buttons: [{ label: t('save_dev'), v: 'save', cls: 'b1' }, { label: t('save_share'), v: 'share', cls: 'b2' }, { label: t('btn_cancel'), v: null, cls: 'bd' }] });
+    if (how === 'share') await cap.Plugins.Share.share({ title: name, url: res.uri, dialogTitle: name });
+    else if (how === 'save') {
+      let P = cap.Plugins.MirasFiles; try { P = P || cap.registerPlugin('MirasFiles'); } catch (e) { }
+      try { const r = await P.save({ name, mime: blob.type || 'application/octet-stream', src: res.uri }); if (r && r.saved) toast(t('file_saved')); }
+      catch (e) { console.warn('save', e); await cap.Plugins.Share.share({ title: name, url: res.uri, dialogTitle: name }); }
+    }
     return;
   }
   const a = document.createElement('a');
@@ -141,7 +147,7 @@ const ALIASES = [
   ['lang', /(язык|^dili?$|language|^lang)/],
   ['date', /(дата|век|год|^sene|asyr|centur|^date|year|tarih|yuzyil)/],
   ['type', /^(вид|тип|gornus|type|kind)/],
-  ['pages', /(стран|листов|sahyp|page|^pp?$)/],
+  ['pages', /(стран|лист|sahyp|warak|page|leaf|leaves|^pp?$)/],
   ['loc', /(хранен|мест|\byer|saklan|locat|storage|shelf|полка|шкаф)/],
 ];
 function matchHeader(h) {

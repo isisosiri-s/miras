@@ -70,6 +70,53 @@ public class MirasBarsPlugin extends Plugin {
     }
 }
 `);
+  fs.writeFileSync(dir + '/MirasFilesPlugin.java', `package app.miras.archive;
+
+import android.app.Activity;
+import android.content.Intent;
+import android.net.Uri;
+import androidx.activity.result.ActivityResult;
+import com.getcapacitor.JSObject;
+import com.getcapacitor.Plugin;
+import com.getcapacitor.PluginCall;
+import com.getcapacitor.PluginMethod;
+import com.getcapacitor.annotation.ActivityCallback;
+import com.getcapacitor.annotation.CapacitorPlugin;
+import java.io.FileInputStream;
+import java.io.InputStream;
+import java.io.OutputStream;
+
+@CapacitorPlugin(name = "MirasFiles")
+public class MirasFilesPlugin extends Plugin {
+    @PluginMethod
+    public void save(PluginCall call) {
+        Intent i = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+        i.addCategory(Intent.CATEGORY_OPENABLE);
+        i.setType(call.getString("mime", "application/octet-stream"));
+        i.putExtra(Intent.EXTRA_TITLE, call.getString("name", "miras.bin"));
+        startActivityForResult(call, i, "saveDone");
+    }
+
+    @ActivityCallback
+    private void saveDone(PluginCall call, ActivityResult result) {
+        if (call == null) return;
+        JSObject o = new JSObject();
+        if (result.getResultCode() != Activity.RESULT_OK || result.getData() == null || result.getData().getData() == null) {
+            o.put("saved", false); call.resolve(o); return;
+        }
+        try {
+            Uri dest = result.getData().getData();
+            String path = Uri.parse(call.getString("src")).getPath();
+            InputStream in = new FileInputStream(path);
+            OutputStream out = getContext().getContentResolver().openOutputStream(dest);
+            byte[] buf = new byte[65536]; int n;
+            while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
+            out.flush(); out.close(); in.close();
+            o.put("saved", true); call.resolve(o);
+        } catch (Exception e) { call.reject(String.valueOf(e)); }
+    }
+}
+`);
   fs.writeFileSync(dir + '/MainActivity.java', `package app.miras.archive;
 
 import android.os.Bundle;
@@ -79,6 +126,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(MirasBarsPlugin.class);
+        registerPlugin(MirasFilesPlugin.class);
         super.onCreate(savedInstanceState);
     }
 }

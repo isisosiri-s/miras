@@ -71,8 +71,10 @@ function toast(msg, ms = 2400) {
 function ask({ title, text, html, buttons, onMount, dismiss = true }) {
   return new Promise(resolve => {
     const mb = document.createElement('div'); mb.className = 'mb';
-    const btns = (buttons || [{ label: t('ok'), v: true, cls: 'b1' }]).map((b, i) => `<button class="btn ${b.cls || 'b2'}" data-i="${i}">${esc(b.label)}</button>`).join('');
-    mb.innerHTML = `<div class="modal" role="dialog">${title ? `<h3>${esc(title)}</h3>` : ''}${text ? `<p>${esc(text)}</p>` : ''}${html || ''}<div class="btns">${btns}</div></div>`;
+    const bl = buttons || [{ label: t('ok'), v: true, cls: 'b1' }];
+    const stack = bl.length >= 4 || (bl.length >= 3 && bl.some(b => String(b.label).length > 16));
+    const btns = bl.map((b, i) => `<button class="btn ${b.cls || 'b2'}" data-i="${i}">${esc(b.label)}</button>`).join('');
+    mb.innerHTML = `<div class="modal" role="dialog">${title ? `<h3>${esc(title)}</h3>` : ''}${text ? `<p>${esc(text)}</p>` : ''}${html || ''}<div class="btns${stack ? ' stack' : ''}">${btns}</div></div>`;
     document.body.appendChild(mb);
     let done = false;
     const layer = { onBack: () => { finish(null, true); return true; } };
@@ -157,7 +159,8 @@ function mountPad(root, { fixed = 0, max = 6, onChange, onDone }) {
   const dots = $('#pdots', root);
   const draw = () => {
     const n = fixed || Math.max(4, v.length);
-    dots.innerHTML = Array.from({ length: n }, (_, i) => `<i class="pdot${i < v.length ? ' on' : ''}"></i>`).join('');
+    if (dots.children.length !== n) dots.innerHTML = Array.from({ length: n }, () => '<i class="pdot"></i>').join('');
+    for (let i = 0; i < n; i++) dots.children[i].classList.toggle('on', i < v.length);
   };
   const press = k => {
     if (off) return;
@@ -166,7 +169,12 @@ function mountPad(root, { fixed = 0, max = 6, onChange, onDone }) {
     draw(); onChange && onChange(v);
     if (fixed && v.length === fixed) onDone && onDone(v);
   };
-  $$('#pad button[data-k]', root).forEach(b => b.onclick = () => press(b.dataset.k));
+  // react on finger-down (no click delay); the click handler stays for mouse/keyboard-less cases
+  let lastDown = 0;
+  $$('#pad button[data-k]', root).forEach(b => {
+    b.addEventListener('pointerdown', e => { if (e.button) return; lastDown = Date.now(); press(b.dataset.k); });
+    b.addEventListener('click', () => { if (Date.now() - lastDown > 600) press(b.dataset.k); });
+  });
   const kd = e => {
     if (!document.body.contains(dots)) { document.removeEventListener('keydown', kd); return; }
     if (/^\d$/.test(e.key)) press(e.key); else if (e.key === 'Backspace') press('del');
@@ -379,6 +387,7 @@ function computeList() {
   UI.list = l; UI.listKey = key; return l;
 }
 function viewBooks(main) {
+  main.classList.remove('hdrhide');
   main.innerHTML = `${mobBar('Miras')}
   <div class="toolbar"><div class="trow"><div class="search">${IC.search}<input id="q" type="search" placeholder="${esc(t('search_ph'))}" value="${esc(UI.q)}" autocomplete="off"></div>
     <button class="sbtn only-wide" id="bImp">${IC.imp}${t('btn_import')}</button><button class="sbtn only-wide" id="bExp">${IC.imp.replace('M12 3v12M7 10l5 5 5-5', 'M12 15V3M7 8l5-5 5 5')}${t('btn_export')}</button><button class="sbtn pri only-wide" id="bNew">${IC.plus.replace('width="26" height="26"', 'width="18" height="18"')}${t('btn_new')}</button></div>
@@ -386,14 +395,15 @@ function viewBooks(main) {
   <div id="banner"></div><div class="counter" id="counter"></div><div class="prog"><i id="prog"></i></div>
   <div class="selbar hidden" id="selbar"></div>
   <div class="tablewrap" id="tw"><div class="th" id="th"></div><div id="rows"></div></div>
+  <div class="srail" id="srail"><div class="sthumb" id="sthumb"></div></div>
   <button class="fab only-narrow" id="fab" aria-label="${esc(t('btn_new'))}">${IC.plus}</button>`;
   bindMobBar();
   const q = $('#q');
   let qt; q.oninput = () => { clearTimeout(qt); qt = setTimeout(() => { UI.q = q.value; refreshList(); const w = $('#tw'); if (w) w.scrollTop = 0; }, 120); };
-  $('#bNew').onclick = () => openCard(null); $('#fab').onclick = () => openCard(null);
+  $('#bNew').onclick = () => addRecord(); $('#fab').onclick = () => addRecord();
   $('#bImp').onclick = () => startImport(); $('#bExp').onclick = () => goRoute('ie');
   renderChips();
-  $('#tw').addEventListener('scroll', onListScroll, { passive: true }); bindResize();
+  $('#tw').addEventListener('scroll', onListScroll, { passive: true }); bindResize(); bindRail();
   const rows = $('#rows');
   rows.addEventListener('click', onRowClick);
   let lp = null, lpFired = false;
@@ -460,9 +470,47 @@ function renderWindow(force) {
   rows.style.paddingTop = from * rh + 'px'; rows.style.paddingBottom = (n - to) * rh + 'px';
   rows.innerHTML = list.slice(from, to).map(r => rowHtml(r, v.cols, '')).join('');
 }
+const LAND_SHORT = '(orientation:landscape) and (max-height:520px)';
 function onListScroll() {
   const v = UI.vr; if (v.raf) return;
-  v.raf = requestAnimationFrame(() => { v.raf = 0; renderWindow(false); });
+  v.raf = requestAnimationFrame(() => {
+    v.raf = 0;
+    const tw = $('#tw');
+    // phone in landscape: header, search, chips, banner and counter fold away while the list is scrolled
+    if (tw && matchMedia(LAND_SHORT).matches) {
+      const p = tw.parentElement, hid = p.classList.contains('hdrhide'), st = tw.scrollTop;
+      if (!hid && st > 60) { p.classList.add('hdrhide'); v.from = -1; }
+      else if (hid && st < 8) { p.classList.remove('hdrhide'); v.from = -1; }
+    }
+    renderWindow(false); updateRail();
+  });
+}
+// ---- right-hand scroll slider (touch screens) + jump buttons ----
+const railOn = () => matchMedia('(pointer:coarse)').matches;
+function updateRail() {
+  const tw = $('#tw'), r = $('#srail'), th = $('#sthumb'); if (!tw || !r) return;
+  const max = tw.scrollHeight - tw.clientHeight;
+  const show = railOn() && max > tw.clientHeight * 1.5;
+  r.style.display = show ? 'block' : 'none'; if (!show) return;
+  const hh = 38, rh = tw.clientHeight - hh, thH = 48;
+  r.style.top = (tw.offsetTop + hh) + 'px'; r.style.height = rh + 'px';
+  th.style.height = thH + 'px'; th.style.transform = `translateY(${Math.max(0, Math.min(1, tw.scrollTop / max)) * (rh - thH)}px)`;
+}
+function bindRail() {
+  const tw = $('#tw'), r = $('#srail'); if (!tw || !r) return;
+  const go = e => {
+    const b = r.getBoundingClientRect(), thH = 48, max = tw.scrollHeight - tw.clientHeight;
+    tw.scrollTop = Math.max(0, Math.min(1, (e.clientY - b.top - thH / 2) / (b.height - thH))) * max;
+  };
+  r.addEventListener('pointerdown', e => { e.preventDefault(); r.setPointerCapture(e.pointerId); r.classList.add('on'); go(e); });
+  r.addEventListener('pointermove', e => { if (r.classList.contains('on')) go(e); });
+  const up = () => r.classList.remove('on'); r.addEventListener('pointerup', up); r.addEventListener('pointercancel', up);
+  const c = $('#counter');
+  if (c) c.addEventListener('click', e => {
+    const j = e.target.closest('[data-jump]'); if (!j) return;
+    tw.scrollTop = j.dataset.jump === 'end' ? tw.scrollHeight : 0;
+  });
+  window.addEventListener('resize', updateRail);
 }
 
 // ---- column header menu: sort, filter, auto width, hide ----
@@ -532,12 +580,12 @@ function refreshList() {
     rows.style.paddingTop = rows.style.paddingBottom = '0px'; v.from = v.to = -1;
     rows.innerHTML = `<div class="empty"><b>${total.total ? t('list_none') : t('list_empty')}</b>${total.total ? '' : t('list_empty_sub')}</div>`;
   } else renderWindow(true);
-  renderCounter(list, total); renderBanner(total); renderSelbar();
+  renderCounter(list, total); renderBanner(total); renderSelbar(); updateRail();
 }
 function renderCounter(list, total) {
   const c = $('#counter'); if (!c) return;
   const found = (UI.q || UI.filter !== 'all') ? ` · ${t('list_found', { n: `<b>${fmtInt(list.length)}</b>` })}` : '';
-  c.innerHTML = `<span>${t('list_total')}: <b>${fmtInt(total.total)}</b></span><span>· ${t('list_scanned')}: <b>${fmtInt(total.scanned)}</b></span>${H.rest && H.restUi ? `<span>· ${t('list_rest')}: <b>${fmtInt(total.rest)}</b></span>` : ''}${found}<span class="pct">${fmtPct(total.scanned, total.total)}</span>`;
+  c.innerHTML = `<span>${t('list_total')}: <b>${fmtInt(total.total)}</b></span><span>· ${t('list_scanned')}: <b>${fmtInt(total.scanned)}</b></span>${H.rest && H.restUi ? `<span>· ${t('list_rest')}: <b>${fmtInt(total.rest)}</b></span>` : ''}${found}<span class="pct">${fmtPct(total.scanned, total.total)}</span>${list.length > 40 ? `<button class="jmp" data-jump="top">${esc(t('go_top'))}</button><button class="jmp" data-jump="end">${esc(t('go_end'))}</button>` : ''}`;
   $('#prog').style.width = (total.total ? total.scanned / total.total * 100 : 0) + '%';
 }
 function renderBanner(total) {
@@ -636,7 +684,20 @@ async function massChange() {
 }
 
 // ---------- card ----------
-function cardCols() { return visibleCols(); }
+// card field order is fixed (independent of the table column order)
+function cardCols() {
+  const vis = visibleCols(); const by = {}; for (const c of vis) by[c.key] = c;
+  const HEAD = ['id', 'inv', 'title', 'author', 'lang', 'date', 'type', 'pages', 'loc'], TAIL = ['scanned', 'restored'];
+  const out = []; for (const k of HEAD) if (by[k]) out.push(by[k]);
+  for (const c of vis) if (!HEAD.includes(c.key) && !TAIL.includes(c.key)) out.push(c);
+  for (const k of TAIL) if (by[k]) out.push(by[k]);
+  return out;
+}
+const cardTitleOf = (isNew, type) => t((isNew ? 'card_new' : 'card_title') + (type === 'manuscript' || type === 'printed' ? '_' + type : ''));
+async function addRecord() {
+  const v = await ask({ title: t('add_what'), buttons: [{ label: t('type_manuscript'), v: 'manuscript', cls: 'b1' }, { label: t('type_printed'), v: 'printed', cls: 'b1' }, { label: t('btn_cancel'), v: null, cls: 'b2' }] });
+  if (v) openCard(null, undefined, false, v);
+}
 function cardDefaults() {
   const live = liveRecords(); if (!live.length) return {};
   const last = live.reduce((a, b) => (b.created > a.created ? b : a));
@@ -648,17 +709,17 @@ function datalist(key) {
   const s = new Set(); for (const r of DB.records) if (isLive(r) && r[key]) { s.add(r[key]); if (s.size > 300) break; }
   return `<datalist id="dl_${key}">${[...s].sort().map(v => `<option value="${esc(v)}">`).join('')}</datalist>`;
 }
-async function openCard(uuid, draftVals, silentRerender) {
+async function openCard(uuid, draftVals, silentRerender, presetType) {
   if (UI.card && !silentRerender) {
     if (UI.card.uuid === uuid && !!uuid) return;
     const ok = await confirmLeaveCard(); if (!ok) return;
   }
   const isNew = !uuid; const rec = uuid ? byUuid().get(uuid) : null;
   const host = $('#cardhost'); if (!host) return;
-  const base = rec ? Object.fromEntries(Object.keys(rec).map(k => [k, rec[k]])) : { scanned: false, ...cardDefaults() };
+  const base = rec ? Object.fromEntries(Object.keys(rec).map(k => [k, rec[k]])) : { scanned: false, ...cardDefaults(), ...(presetType ? { type: presetType } : {}) };
   const vals = base;
   const wasOpen = !!UI.card;
-  UI.card = { uuid: uuid || null, isNew, init: null, rec };
+  UI.card = { uuid: uuid || null, isNew, init: null, rec, preset: presetType || '' };
   const cols = cardCols();
   const body = cols.map(c => {
     if (c.kind === 'id') return '';
@@ -671,13 +732,14 @@ async function openCard(uuid, draftVals, silentRerender) {
     }
     return `<div class="fld ${half ? 'half' : ''}">${inner}</div>`;
   }).join('');
-  host.innerHTML = `<div class="cardhead"><button class="ib backb" id="cBack">${IC.back}</button><h3>${isNew ? t('card_new') : t('card_title')}</h3>${!isNew ? `<button class="ib" id="cDel" aria-label="${esc(t('btn_delete'))}">${IC.trash}</button>` : ''}<button class="ib only-wide" id="cX">${IC.close}</button></div>
+  host.innerHTML = `<div class="cardhead"><button class="ib backb" id="cBack">${IC.back}</button><h3 id="cTitle">${cardTitleOf(isNew, vals.type)}</h3>${!isNew ? `<button class="ib" id="cDel" aria-label="${esc(t('btn_delete'))}">${IC.trash}</button>` : ''}<button class="ib only-wide" id="cX">${IC.close}</button></div>
     <div class="cardbody" id="cBody">${body}<div class="warn hidden" id="dupWarn">${IC.warn}<span></span></div></div>
     <div class="actions"><button class="btn b2" id="cCancel">${t('btn_cancel')}</button>${isNew ? `<button class="btn b3" id="cNext">${t('card_save_next')}</button>` : ''}<button class="btn b1" id="cSave">${t('btn_save')}</button></div>`;
   host.classList.add('on'); $('#shell').classList.add('hascard');
   bindCheckButtons(host);
   UI.card.init = JSON.stringify(readCard());
   if (draftVals) applyCardVals(draftVals);
+  { const tt = $('#f_type', host); if (tt) tt.addEventListener('change', () => { $('#cTitle').textContent = cardTitleOf(UI.card.isNew, tt.value); }); }
   $('#cBack').onclick = () => history.back();
   $('#cX').onclick = () => closeCard(false);
   $('#cCancel').onclick = () => closeCard(false);
@@ -748,7 +810,7 @@ function saveCardCore() {
   if (!inv) { ie.classList.remove('hidden'); ie.textContent = t('err_inv_req'); iEl.classList.add('err'); iEl.focus(); return false; }
   const ex = findByInv(inv, UI.card.uuid);
   if (ex) { ie.classList.remove('hidden'); ie.textContent = t('err_inv_dup', { id: ex.id }); iEl.classList.add('err'); iEl.focus(); return false; }
-  vals.inv = inv;
+  vals.inv = inv; if (UI.card.isNew && UI.card.preset && vals.type === undefined) vals.type = UI.card.preset;
   if (UI.card.isNew) { UI.card.rec = newRecord(vals); UI.card.isNew = false; UI.card.uuid = UI.card.rec.uuid; } else updateRecord(UI.card.rec, vals);
   UI.card.init = JSON.stringify(readCard());
   toast(t('toast_saved'), 1200);
@@ -756,8 +818,9 @@ function saveCardCore() {
 }
 async function saveCard(next) {
   if (!saveCardCore()) return false;
+  const pre = (UI.card.rec && UI.card.rec.type) || UI.card.preset || '';
   const l = UI.card.layer; closeCardUI(); if (l) await dropLayer(l);
-  if (next) openCard(null);
+  if (next) openCard(null, undefined, false, pre);
   return true;
 }
 

@@ -2,10 +2,15 @@ name: Build APK
 on:
   push:
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Build the Windows exe for this existing release, e.g. 1.1.19'
+        required: true
 permissions:
   contents: write
 jobs:
   apk:
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -28,7 +33,7 @@ jobs:
             echo "WARNING: secret ANDROID_KEYSTORE_B64 not found - random key will be used"
           fi
       - run: |
-          sed -i "s/const APP_VERSION = '[^']*'/const APP_VERSION = '1.1.${{ github.run_number }}'/" www/core.js
+          sed -i "s/const APP_VERSION = '[^']*'/const APP_VERSION = '${{ github.event.inputs.version }}'/" www/core.js
           grep -n "const APP_VERSION" www/core.js
           npm install --no-audit --no-fund
           npx cap add android
@@ -56,6 +61,7 @@ jobs:
           name: Miras 1.1.${{ github.run_number }}
           files: Miras.apk
   exe:
+    if: github.event_name == 'workflow_dispatch'
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -64,12 +70,11 @@ jobs:
       - name: Build Windows portable exe
         shell: bash
         run: |
-          sed -i "s/const APP_VERSION = '[^']*'/const APP_VERSION = '1.1.${{ github.run_number }}'/" www/core.js
+          sed -i "s/const APP_VERSION = '[^']*'/const APP_VERSION = '${{ github.event.inputs.version }}'/" www/core.js
           npm install --no-audit --no-fund
           npx electron-builder --win portable --x64 --publish never
           ls dist
       - uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.1.${{ github.run_number }}
-          name: Miras 1.1.${{ github.run_number }}
+          tag_name: v${{ github.event.inputs.version }}
           files: dist/Miras.exe
