@@ -1,6 +1,6 @@
 'use strict';
 /* Miras core: i18n, utils, crypto, storage, data model */
-const APP_VERSION = '1.1.14';
+const APP_VERSION = '1.1.15';
 const PBKDF_ITER = 250000;
 const TRASH_DAYS = 30;
 
@@ -165,10 +165,9 @@ const BUILTIN_COLS = [
   { key: 'loc', kind: 'text', i18n: 'col_loc' },
   { key: 'scanned', kind: 'check', i18n: 'col_scan', card: 'list_scanned' },
   { key: 'restored', kind: 'check', i18n: 'col_rest', card: 'rest_card' },
-  { key: 'note', kind: 'text', i18n: 'col_note' },
 ];
 const BUILTIN_KEYS = new Set(BUILTIN_COLS.map(c => c.key));
-const FIELD_KEYS = ['inv', 'title', 'author', 'lang', 'date', 'type', 'pages', 'loc', 'scanned', 'restored', 'note'];
+const FIELD_KEYS = ['inv', 'title', 'author', 'lang', 'date', 'type', 'pages', 'loc', 'scanned', 'restored'];
 
 function defaultColumns() {
   return BUILTIN_COLS.map(c => ({ key: c.key, b: 1, kind: c.kind, names: null, hidden: false, opts: [], mts: 0 }));

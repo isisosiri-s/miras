@@ -42,7 +42,7 @@ const Native = {
       const cs = e => e ? getComputedStyle(e).backgroundColor : '';
       const hex = c => { const m = /(\d+)\D+(\d+)\D+(\d+)/.exec(c || ''); return m ? '#' + [1, 2, 3].map(i => (+m[i]).toString(16).padStart(2, '0')).join('') : null; };
       t = hex(cs(document.querySelector('.appbar'))) || '#5B3A1E';
-      b = hex(cs(document.body)) || hex(getComputedStyle(document.documentElement).getPropertyValue('--bg')) || '#F6F1E9';
+      b = (getComputedStyle(document.documentElement).getPropertyValue('--bg') || '').trim() || '#F6F1E9';
     }
     const k = t + b; if (k === this._barKey) return; this._barKey = k;
     // page is drawn edge-to-edge under the bars: paint the safe-area strips with the screen colours
