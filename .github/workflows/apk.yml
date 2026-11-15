@@ -55,3 +55,21 @@ jobs:
           tag_name: v1.1.${{ github.run_number }}
           name: Miras 1.1.${{ github.run_number }}
           files: Miras.apk
+  exe:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: Build Windows portable exe
+        shell: bash
+        run: |
+          sed -i "s/const APP_VERSION = '[^']*'/const APP_VERSION = '1.1.${{ github.run_number }}'/" www/core.js
+          npm install --no-audit --no-fund
+          npx electron-builder --win portable --x64 --publish never
+          ls dist
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.1.${{ github.run_number }}
+          name: Miras 1.1.${{ github.run_number }}
+          files: dist/Miras.exe
