@@ -378,3 +378,9 @@ input,textarea,[contenteditable="true"],.lan-url,.lan-code{-webkit-user-select:t
 .lan-code{animation:riseIn .3s ease both}
 html.lite *{will-change:auto!important}
 html.lite #rows.listin .tr,html.lite .routefwd,html.lite .routeback{animation-duration:.01ms}
+
+/* 1.1.29 reports: four kind tiles (no totals card), "other" badge */
+.rp-cards{display:grid!important;grid-template-columns:repeat(2,1fr);gap:8px}
+@media (min-width:700px){.rp-cards{grid-template-columns:repeat(4,1fr)}}
+.rp-row .bd.o,.rp-pr .bd.o{background:#E4E0D6;color:#2B2118}
+[data-theme=dark] .rp-row .bd.o,[data-theme=dark] .rp-pr .bd.o{background:#4A443A;color:#F3E9D6}

@@ -2,14 +2,16 @@
 /* Miras — reports: folders (e.g. 2026) -> months -> rows. The archive is only read, never changed. */
 
 UI.rep = { f: null, m: null, pick: null };
-const REP_KINDS = ['manuscript', 'printed', 'book'];
-const repKindLabel = k => (k === 'book' ? t('rep_k_book') : t('type_' + k));
+const REP_KINDS = ['manuscript', 'printed', 'book', 'other'];
+// books and "other" are typed in by hand (no archive inventory number) and always count as scanned
+const repManual = k => k === 'book' || k === 'other';
+const repKindLabel = k => (repManual(k) ? t('rep_k_' + k) : t('type_' + k));
 const repMonthName = n => t('rep_m' + n);
 const repFolder = id => DB.reports.find(f => f.id === id);
 const repMonthOf = (f, id) => (f ? f.months.find(m => m.id === id) : null);
 // change stamps and delete markers: they let two devices merge reports
 const repTomb = id => { DB.repTomb[id] = Date.now(); };
-const repBadge = k => (k === 'printed' ? 'l' : k === 'book' ? 'b' : '');
+const repBadge = k => (k === 'printed' ? 'l' : k === 'book' ? 'b' : k === 'other' ? 'o' : '');
 
 function repBack() {
   const R = UI.rep;
@@ -21,17 +23,17 @@ function repBack() {
 }
 function repRerender() { const p = $('.page'), y = p ? p.scrollTop : 0; renderRoute(); const q = $('.page'); if (q) q.scrollTop = y; }
 function repLeavesOf(v) { const n = typeof v === 'number' ? v : parseNum(String(v ?? '')); return typeof n === 'number' && isFinite(n) ? n : 0; }
-function repRec(row) { return row.kind !== 'book' && row.inv ? findByInv(row.inv) : null; }
+function repRec(row) { return !repManual(row.kind) && row.inv ? findByInv(row.inv) : null; }
 function repRowTitle(row) { const r = repRec(row); return (r && r.title) || row.title || ''; }
-function repRowScanned(row) { if (row.kind === 'book') return true; // books in a report always count as scanned
+function repRowScanned(row) { if (repManual(row.kind)) return true; // books and "other" in a report always count as scanned
   const r = repRec(row); return !!(r && r.scanned); }
 // totals for one month or (array) for a whole folder; books always count as scanned
 function repStats(m) {
-  const s = { n: 0, l: 0, sn: 0, sl: 0, rest: 0, by: { manuscript: { n: 0, l: 0 }, printed: { n: 0, l: 0 }, book: { n: 0, l: 0 } } };
+  const s = { n: 0, l: 0, sn: 0, sl: 0, rest: 0, by: { manuscript: { n: 0, l: 0 }, printed: { n: 0, l: 0 }, book: { n: 0, l: 0 }, other: { n: 0, l: 0 } } };
   for (const mo of (Array.isArray(m) ? m : [m])) for (const row of mo.rows) {
     const l = repLeavesOf(row.leaves); s.n++; s.l += l;
     const b = s.by[row.kind] || s.by.manuscript; b.n++; b.l += l;
-    if (row.kind === 'book' || repRowScanned(row)) { s.sn++; s.sl += l; }
+    if (repRowScanned(row)) { s.sn++; s.sl += l; }
     const r = repRec(row); if (r && r.restored) s.rest++;
   }
   return s;
@@ -41,7 +43,7 @@ const repKey = s => norm(s).replace(/[^\p{L}\p{N}]+/gu, '');
 function repSearchInv(q) {
   const k = repKey(q), out = []; if (!k) return { out, more: false };
   for (const f of DB.reports) for (const m of [...f.months].sort((a, b) => b.m - a.m)) for (const row of m.rows) {
-    if (row.kind === 'book' || !row.inv || !repKey(row.inv).includes(k)) continue;
+    if (repManual(row.kind) || !row.inv || !repKey(row.inv).includes(k)) continue;
     if (out.length >= 100) return { out, more: true };
     out.push({ f, m, row });
   }
@@ -57,11 +59,11 @@ function repWhere(inv, exceptMonth) {
   const k = invKey(inv); if (!k) return null;
   for (const f of DB.reports) for (const m of f.months) {
     if (m === exceptMonth) continue;
-    if (m.rows.some(r => r.kind !== 'book' && invKey(r.inv) === k)) return `${repMonthName(m.m)} ${f.name}`;
+    if (m.rows.some(r => !repManual(r.kind) && invKey(r.inv) === k)) return `${repMonthName(m.m)} ${f.name}`;
   }
   return null;
 }
-const repHere = (m, inv, exceptRow) => { const k = invKey(inv); return !!k && m.rows.some(r => r !== exceptRow && r.kind !== 'book' && invKey(r.inv) === k); };
+const repHere = (m, inv, exceptRow) => { const k = invKey(inv); return !!k && m.rows.some(r => r !== exceptRow && !repManual(r.kind) && invKey(r.inv) === k); };
 
 // ---------- entry point ----------
 function viewReports(main) {
@@ -133,10 +135,10 @@ function repViewMonths(main, f) {
   const ms = [...f.months].sort((a, b) => b.m - a.m);
   const rows = ms.map(m => {
     const s = repStats(m);
-    return `<div class="rp-item" data-m="${m.id}"><span class="rp-ic">📂</span><div class="rp-tx"><div class="n">${esc(repMonthName(m.m))}</div><div class="s">${s.n ? t('rep_month_sub2', { n: s.n, l: fmtNum(s.l), s: s.sn }) : t('rep_empty')}</div></div><button class="rp-dots" data-md="${m.id}" aria-label="…">⋯</button><span class="chev">${IC.chev}</span></div>`;
+    return `<div class="rp-item" data-m="${m.id}"><span class="rp-ic">📂</span><div class="rp-tx"><div class="n">${esc(repMonthName(m.m))}</div><div class="s">${s.n ? REP_KINDS.filter(k => s.by[k].n).map(k => s.by[k].n + ' ' + t('rep_ab_' + k)).join(' · ') : t('rep_empty')}</div></div><button class="rp-dots" data-md="${m.id}" aria-label="…">⋯</button><span class="chev">${IC.chev}</span></div>`;
   }).join('');
   const fs = repStats(f.months), kc = k => `<div class="rp-c"><div class="l">${esc(t('rep_c_' + k))}</div><div class="v">${fs.by[k].n}</div><div class="s">${fmtNum(fs.by[k].l)} ${esc(t('rep_leaves').toLowerCase())}</div></div>`;
-  const total = f.months.length ? `<div class="rp-cards">${REP_KINDS.map(kc).join('')}</div><div class="rp-tot"><div class="s rp-tt">${esc(t('rep_year_total', { n: f.name }))}</div><div class="r1"><span>${esc(t('rep_total'))} <b>${fs.n}</b></span><span>${esc(t('rep_total_leaves'))} <b>${fmtNum(fs.l)}</b></span></div><div class="s">${esc(t('rep_of_scanned'))}: ${fs.sn} · ${fmtNum(fs.sl)} ${esc(t('rep_leaves').toLowerCase())}</div>${H.rest ? `<div class="s">${esc(t('rep_rest_line'))}: ${fs.rest}</div>` : ''}</div>` : '';
+  const total = f.months.length ? `<div class="rp-cards">${REP_KINDS.map(kc).join('')}</div>` : '';
   repShell(main, f.name, `${total}<div class="rp-list">${rows || `<div class="empty"><b>${t('rep_empty')}</b></div>`}</div>`, t('rep_add_month'), async () => {
     const used = new Set(f.months.map(m => m.m));
     const n = await ask({
@@ -162,7 +164,7 @@ function repViewMonths(main, f) {
 // ---------- level 3: the report ----------
 function repRowHtml(row) {
   const rec = repRec(row), sc = repRowScanned(row), title = repRowTitle(row);
-  const sub = row.kind === 'book' ? t('rep_manual') : (row.inv ? `${t('rep_inv')} ${esc(row.inv)}${rec ? '' : ` · ${t('rep_not_in_archive')}`}` : '');
+  const sub = repManual(row.kind) ? t('rep_manual') : (row.inv ? `${t('rep_inv')} ${esc(row.inv)}${rec ? '' : ` · ${t('rep_not_in_archive')}`}` : '');
   const lv = row.leaves === '' || row.leaves == null ? '–' : fmtNum(repLeavesOf(row.leaves));
   return `<div class="rp-row" data-id="${row.id}"><span class="rp-h" aria-hidden="true">⋮⋮</span><span class="chk">✓</span><span class="bd ${repBadge(row.kind)}">${esc(repKindLabel(row.kind).slice(0, 5).toUpperCase())}</span><div class="rp-t"><b>${esc(title) || '–'}</b><span>${sub}</span></div><div class="rp-q">${lv}<i>${esc(t('rep_leaves').toLowerCase())}</i></div><span class="sc ${sc ? 'y' : 'n'}">✓</span></div>`;
 }
@@ -171,8 +173,6 @@ function repViewMonth(main, f, m) {
   const s = repStats(m);
   const card = k => `<div class="rp-c"><div class="l">${esc(t('rep_c_' + k))}</div><div class="v">${s.by[k].n}</div><div class="s">${fmtNum(s.by[k].l)} ${esc(t('rep_leaves').toLowerCase())}</div></div>`;
   const inner = `<div class="rp-cards">${REP_KINDS.map(card).join('')}</div>
-    <div class="rp-tot"><div class="r1"><span>${esc(t('rep_total'))} <b>${s.n}</b></span><span>${esc(t('rep_total_leaves'))} <b>${fmtNum(s.l)}</b></span></div>
-      <div class="s">${esc(t('rep_of_scanned'))}: ${s.sn} · ${fmtNum(s.sl)} ${esc(t('rep_leaves').toLowerCase())}</div>${H.rest ? `<div class="s">${esc(t('rep_rest_line'))}: ${s.rest}</div>` : ''}</div>
     <div class="rp-tools"><button class="btn b2" id="rpSort">⇅ ${esc(t('rep_sort_type'))}</button><button class="btn b2" id="rpSel">☑ ${esc(t('rep_select'))}</button><button class="btn b1" id="rpArc">+ ${esc(t('rep_from_archive'))}</button></div>
     <div id="rpRows">${m.rows.length ? m.rows.map(repRowHtml).join('') : `<div class="empty">${esc(t('rep_list_empty'))}</div>`}</div>
     <div class="rp-bar hidden" id="rpSelBar"><button class="btn b2" id="rpSCancel">${esc(t('btn_cancel'))}</button><button class="btn b2" id="rpSAll"></button><button class="btn bad" id="rpSDel"></button></div>`;
@@ -268,19 +268,19 @@ function repDrag(box, sel, onDone, idKey) {
 function repRowDlg(m, row) {
   const st = { kind: row ? row.kind : 'manuscript', userKind: !!row, userLeaves: !!row && row.leaves !== '' };
   const html = `<div class="seg" id="rpKind">${REP_KINDS.map(k => `<button type="button" data-k="${k}" class="${k === st.kind ? 'on' : ''}">${esc(repKindLabel(k))}</button>`).join('')}</div>
-    <div id="rpInvBox"><div class="lbl">${esc(t('rep_inv'))}</div><input class="inp" id="rpInv" autocomplete="off" value="${esc(row && row.kind !== 'book' ? row.inv || '' : '')}"><div class="rp-found" id="rpFound"></div></div>
+    <div id="rpInvBox"><div class="lbl">${esc(t('rep_inv'))}</div><input class="inp" id="rpInv" autocomplete="off" value="${esc(row && !repManual(row.kind) ? row.inv || '' : '')}"><div class="rp-found" id="rpFound"></div></div>
     <div id="rpTitleBox"><div class="lbl">${esc(t('rep_title'))}</div><input class="inp" id="rpTitle" autocomplete="off" value="${esc(row ? row.title || '' : '')}"></div>
     <div><div class="lbl">${esc(t('rep_leaves'))}</div><input class="inp" id="rpLeaves" inputmode="decimal" autocomplete="off" value="${row && row.leaves !== '' && row.leaves != null ? esc(String(row.leaves).replace('.', LANG === 'en' ? '.' : ',')) : ''}"></div>
     <div class="group" id="rpScanBox" style="margin:0">${rowSwitch('rpScan', esc(t('rep_scanned_sw')), '', row ? !!row.scanned : false)}</div>`;
   const read = mb => {
     const inv = $('#rpInv', mb).value.trim(), title = $('#rpTitle', mb).value.trim(), lv = $('#rpLeaves', mb).value.trim();
     const n = lv === '' ? '' : parseNum(lv);
-    return { kind: st.kind, inv: st.kind === 'book' ? '' : inv, title, leaves: n === null ? '' : n, scanned: st.kind === 'book' };
+    return { kind: st.kind, inv: repManual(st.kind) ? '' : inv, title, leaves: n === null ? '' : n, scanned: repManual(st.kind) };
   };
   // validate, resolve duplicates; returns the clean values or null
   const prepare = async mb => {
     const v = read(mb);
-    if (v.kind === 'book') { if (!v.title) { toast(t('rep_title_need')); $('#rpTitle', mb).focus(); return null; } }
+    if (repManual(v.kind)) { if (!v.title) { toast(t('rep_title_need')); $('#rpTitle', mb).focus(); return null; } }
     else {
       if (!v.inv) { toast(t('rep_inv_need')); $('#rpInv', mb).focus(); return null; }
       if (repHere(m, v.inv, row)) { toast(t('rep_in_this')); return null; }
@@ -294,13 +294,13 @@ function repRowDlg(m, row) {
     return v;
   };
   const sync = mb => {
-    const k = st.kind, inv = $('#rpInv', mb).value.trim(), rec = k !== 'book' && inv ? findByInv(inv) : null;
+    const k = st.kind, inv = $('#rpInv', mb).value.trim(), rec = !repManual(k) && inv ? findByInv(inv) : null;
     $$('#rpKind button', mb).forEach(b => b.classList.toggle('on', b.dataset.k === k));
-    $('#rpInvBox', mb).classList.toggle('hidden', k === 'book');
+    $('#rpInvBox', mb).classList.toggle('hidden', repManual(k));
     $('#rpScanBox', mb).classList.add('hidden');
-    $('#rpTitleBox', mb).classList.toggle('hidden', k !== 'book' && (!!rec || !inv));
+    $('#rpTitleBox', mb).classList.toggle('hidden', !repManual(k) && (!!rec || !inv));
     const fd = $('#rpFound', mb);
-    if (k === 'book' || !inv) fd.textContent = '';
+    if (repManual(k) || !inv) fd.textContent = '';
     else if (rec) { fd.className = 'rp-found ok'; fd.textContent = `✓ ${rec.title || ''}${rec.author ? ' · ' + rec.author : ''}`; }
     else { fd.className = 'rp-found bad'; fd.textContent = t('rep_not_in_archive'); }
     if (rec) {
