@@ -39,7 +39,13 @@ async function boot() {
   if (!ready) showSetup();
   else if (!Auth.hasPin()) { await Auth.openPlain(); afterUnlock(); }
   else showLock();
-  if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => { });
+  if ('serviceWorker' in navigator) {
+    if (Native.cap) {
+      // inside the Android/Windows app the files ship with the app: drop any old cache so updates are always visible
+      navigator.serviceWorker.getRegistrations().then(rs => rs.forEach(r => r.unregister())).catch(() => { });
+      if (window.caches) caches.keys().then(ks => ks.forEach(k => caches.delete(k))).catch(() => { });
+    } else if (location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => { });
+  }
   document.getElementById('cover').innerHTML = logoSvg(96);
   hideSplash();
 }

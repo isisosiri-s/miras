@@ -376,7 +376,7 @@ function viewBooks(main) {
   <button class="fab only-narrow" id="fab" aria-label="${esc(t('btn_new'))}">${IC.plus}</button>`;
   bindMobBar();
   const q = $('#q');
-  let qt; q.oninput = () => { clearTimeout(qt); qt = setTimeout(() => { UI.q = q.value; UI.shown = 150; refreshList(); }, 120); };
+  let qt; q.oninput = () => { clearTimeout(qt); qt = setTimeout(() => { UI.q = q.value; refreshList(); const w = $('#tw'); if (w) w.scrollTop = 0; }, 120); };
   $('#bNew').onclick = () => openCard(null); $('#fab').onclick = () => openCard(null);
   $('#bImp').onclick = () => startImport(); $('#bExp').onclick = () => goRoute('ie');
   renderChips();
@@ -394,7 +394,7 @@ function viewBooks(main) {
 function renderChips() {
   const c = $('#chips'); if (!c) return;
   c.innerHTML = [['all', t('f_all')], ['scanned', IC.ok(14) + t('f_scanned')], ['not', IC.no(14) + t('f_notscanned')]].map(([k, l]) => `<button class="chip ${UI.filter === k ? 'on' : ''}" data-f="${k}">${l}</button>`).join('');
-  $$('.chip', c).forEach(b => b.onclick = () => { UI.filter = b.dataset.f; UI.shown = 150; renderChips(); refreshList(); });
+  $$('.chip', c).forEach(b => b.onclick = () => { UI.filter = b.dataset.f; renderChips(); refreshList(); const w = $('#tw'); if (w) w.scrollTop = 0; });
 }
 function rowHtml(r, cols, tpl) {
   const sel = UI.sel.has(r.uuid);
@@ -428,28 +428,38 @@ function bindResize() {
   });
   th.addEventListener('click', e => { if (e.target.closest('.rz')) e.stopPropagation(); });
 }
+// ---- virtualised list: only the rows near the viewport exist in the DOM (fixed row height) ----
+const VBUF = 10;
+UI.vr = { rh: 66, from: -1, to: -1, cols: null, raf: 0 };
+function rowHeightPx() { return Math.round(parseFloat(getComputedStyle(document.documentElement).fontSize) * 4.1); }
+function renderWindow(force) {
+  const rows = $('#rows'), tw = $('#tw'); const list = UI.list; if (!rows || !tw || !list || !list.length) return;
+  const v = UI.vr, rh = v.rh, n = list.length;
+  const rowsTop = rows.getBoundingClientRect().top - tw.getBoundingClientRect().top + tw.scrollTop;
+  const top = Math.max(0, tw.scrollTop - rowsTop), h = tw.clientHeight || 600;
+  const vis0 = Math.floor(top / rh), vis1 = Math.min(n, Math.ceil((top + h) / rh));
+  if (!force && v.from >= 0 && (vis0 >= v.from + 3 || v.from === 0) && (vis1 <= v.to - 3 || v.to === n)) return;
+  const from = Math.max(0, Math.min(n - 1, vis0 - VBUF)), to = Math.min(n, vis1 + VBUF);
+  v.from = from; v.to = to;
+  rows.style.paddingTop = from * rh + 'px'; rows.style.paddingBottom = (n - to) * rh + 'px';
+  rows.innerHTML = list.slice(from, to).map(r => rowHtml(r, v.cols, '')).join('');
+}
+function onListScroll() {
+  const v = UI.vr; if (v.raf) return;
+  v.raf = requestAnimationFrame(() => { v.raf = 0; renderWindow(false); });
+}
 function refreshList() {
   if (UI.route !== 'books') return;
-  const list = computeList(); const cols = tableCols(); const tpl = '';
-  applyLayout(cols); renderHead(cols, tpl);
-  const rows = $('#rows'); if (!rows) return;
+  const list = computeList(); const cols = tableCols();
+  applyLayout(cols); renderHead(cols, '');
+  const rows = $('#rows'), tw = $('#tw'); if (!rows) return;
   const total = counts();
+  const v = UI.vr; v.cols = cols; v.rh = rowHeightPx(); tw.style.setProperty('--rh', v.rh + 'px');
   if (!list.length) {
+    rows.style.paddingTop = rows.style.paddingBottom = '0px'; v.from = v.to = -1;
     rows.innerHTML = `<div class="empty"><b>${total.total ? t('list_none') : t('list_empty')}</b>${total.total ? '' : t('list_empty_sub')}</div>`;
-  } else {
-    const slice = list.slice(0, UI.shown);
-    rows.innerHTML = slice.map(r => rowHtml(r, cols, tpl)).join('') + moreHtml(list);
-  }
+  } else renderWindow(true);
   renderCounter(list, total); renderBanner(total); renderSelbar();
-}
-function moreHtml(list) { return list.length > UI.shown ? `<div class="more" id="more">${t('loading_more', { a: fmtInt(UI.shown), b: fmtInt(list.length) })}</div>` : ''; }
-function onListScroll(e) {
-  const tw = e.target; if (UI.shown >= UI.list.length) return;
-  if (tw.scrollTop + tw.clientHeight >= tw.scrollHeight - 500) {
-    const cols = tableCols(), tpl = gridTpl(cols); const from = UI.shown; UI.shown += 150;
-    const rows = $('#rows'); $('#more') && $('#more').remove();
-    rows.insertAdjacentHTML('beforeend', UI.list.slice(from, UI.shown).map(r => rowHtml(r, cols, tpl)).join('') + moreHtml(UI.list));
-  }
 }
 function renderCounter(list, total) {
   const c = $('#counter'); if (!c) return;

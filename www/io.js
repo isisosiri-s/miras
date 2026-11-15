@@ -167,8 +167,8 @@ function parseWorkbook(buf) {
   const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: '', blankrows: false });
   return rows;
 }
-const TYPE_MS = /(рукопис|golyazma|manuscript|ркп|manuskript|handschrift)/, TYPE_PR = /(печат|chap|cap |printed|print|книга|kitap|литограф|tipograf)/;
-function toType(s) { const n = norm(s); if (!n) return ''; if (TYPE_MS.test(n)) return 'manuscript'; if (/^cap|printed|печат|книга|kitap|литограф/.test(n) || TYPE_PR.test(n)) return 'printed'; return null; }
+const TYPE_MS = /(рукопис|golyazma|manuscript|ркп|manuskript|handschrift)/, TYPE_PR = /(печат|chap|cap |printed|print|книга|kitap|литограф|lithograph|dasbasma|das basma|tipograf)/;
+function toType(s) { const n = norm(s); if (!n) return ''; if (TYPE_MS.test(n)) return 'manuscript'; if (/^cap|printed|печат|книга|kitap|литограф|lithograph|dasbasma|das basma/.test(n) || TYPE_PR.test(n)) return 'printed'; return null; }
 
 function buildImportPlan(rows, fileName) {
   rows = rows.filter(r => r.some(c => cellStr(c) !== ''));

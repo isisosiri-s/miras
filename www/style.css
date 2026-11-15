@@ -83,7 +83,7 @@ svg{display:block}
 .th .mid.stk,.tr .mid.stk{justify-content:center}
 .cbc{padding:0!important;justify-content:center}
 .th{position:sticky;top:0;z-index:3;height:38px;background:var(--chip);font-size:.74rem;font-weight:700;color:var(--muted);border-bottom:1px solid var(--border)}
-.tr{height:4.1rem;border-bottom:2px solid var(--border);font-size:.9rem;cursor:pointer;background:var(--surface)}
+.tr{height:var(--rh,4.1rem);box-sizing:border-box;border-bottom:2px solid var(--border);font-size:.9rem;cursor:pointer;background:var(--surface)}
 .tr:active{background:var(--row-hl)}.tr.sel{background:var(--row-sel)}.tr.cur{background:var(--row-hl)}
 .tr>span>i,.th>span>i{font-style:normal;display:block;min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tr .tx>i{white-space:normal;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-height:1.25;overflow-wrap:anywhere}
