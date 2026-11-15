@@ -73,6 +73,7 @@ document.addEventListener('keydown', e => {
   else if (ctrl && k === 'n') { e.preventDefault(); addRecord(); }
   else if (ctrl && k === 's' && UI.card) { e.preventDefault(); saveCard(false); }
   else if (ctrl && k === 'l') { e.preventDefault(); doLock(); }
+  else if (e.key === 'Escape' && UI.route === 'reports' && UI.rep.sel && !$('.modal') && !typing) { e.preventDefault(); history.back(); }
   else if (e.key === 'Escape' && UI.card && !typing) { e.preventDefault(); closeCard(false); }
   else if (k === '/' && !typing && !ctrl) { e.preventDefault(); if (UI.route !== 'books') goRoute('books'); setTimeout(() => { const q = $('#q'); if (q) q.focus(); }, 30); }
 });

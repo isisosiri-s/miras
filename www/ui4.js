@@ -21,7 +21,8 @@ function repRerender() { const p = $('.page'), y = p ? p.scrollTop : 0; renderRo
 function repLeavesOf(v) { const n = typeof v === 'number' ? v : parseNum(String(v ?? '')); return typeof n === 'number' && isFinite(n) ? n : 0; }
 function repRec(row) { return row.kind !== 'book' && row.inv ? findByInv(row.inv) : null; }
 function repRowTitle(row) { const r = repRec(row); return (r && r.title) || row.title || ''; }
-function repRowScanned(row) { if (row.kind === 'book') return !!row.scanned; const r = repRec(row); return !!(r && r.scanned); }
+function repRowScanned(row) { if (row.kind === 'book') return true; // books in a report always count as scanned
+  const r = repRec(row); return !!(r && r.scanned); }
 // totals for one month or (array) for a whole folder; books always count as scanned
 function repStats(m) {
   const s = { n: 0, l: 0, sn: 0, sl: 0, rest: 0, by: { manuscript: { n: 0, l: 0 }, printed: { n: 0, l: 0 }, book: { n: 0, l: 0 } } };
@@ -33,10 +34,12 @@ function repStats(m) {
   }
   return s;
 }
+// inventory search ignores case, spaces, hyphens and other punctuation
+const repKey = s => norm(s).replace(/[^\p{L}\p{N}]+/gu, '');
 function repSearchInv(q) {
-  const k = invKey(q), out = []; if (!k) return { out, more: false };
+  const k = repKey(q), out = []; if (!k) return { out, more: false };
   for (const f of DB.reports) for (const m of [...f.months].sort((a, b) => b.m - a.m)) for (const row of m.rows) {
-    if (row.kind === 'book' || !row.inv || !invKey(row.inv).includes(k)) continue;
+    if (row.kind === 'book' || !row.inv || !repKey(row.inv).includes(k)) continue;
     if (out.length >= 100) return { out, more: true };
     out.push({ f, m, row });
   }
@@ -181,6 +184,7 @@ function repViewMonth(main, f, m) {
     box.classList.toggle('sel', on); bar.classList.toggle('hidden', !on);
     const fab = $('#rpFab'); if (fab) fab.classList.toggle('hidden', on);
     const aw = $('#rpAddW'); if (aw) aw.classList.toggle('hidden', on);
+    $('.rp-tools').classList.toggle('hidden', on);
     if (!on) return;
     $$('.rp-row', box).forEach(el => { const c = R.sel.has(el.dataset.id); el.classList.toggle('on', c); el.querySelector('.chk').classList.toggle('on', c); });
     $('#rpSAll').textContent = R.sel.size && R.sel.size === m.rows.length ? t('rep_sel_none') : t('rep_sel_all');
@@ -269,7 +273,7 @@ function repRowDlg(m, row) {
   const read = mb => {
     const inv = $('#rpInv', mb).value.trim(), title = $('#rpTitle', mb).value.trim(), lv = $('#rpLeaves', mb).value.trim();
     const n = lv === '' ? '' : parseNum(lv);
-    return { kind: st.kind, inv: st.kind === 'book' ? '' : inv, title, leaves: n === null ? '' : n, scanned: st.kind === 'book' && $('#rpScan', mb).querySelector('.sw').classList.contains('on') };
+    return { kind: st.kind, inv: st.kind === 'book' ? '' : inv, title, leaves: n === null ? '' : n, scanned: st.kind === 'book' };
   };
   // validate, resolve duplicates; returns the clean values or null
   const prepare = async mb => {
@@ -291,7 +295,7 @@ function repRowDlg(m, row) {
     const k = st.kind, inv = $('#rpInv', mb).value.trim(), rec = k !== 'book' && inv ? findByInv(inv) : null;
     $$('#rpKind button', mb).forEach(b => b.classList.toggle('on', b.dataset.k === k));
     $('#rpInvBox', mb).classList.toggle('hidden', k === 'book');
-    $('#rpScanBox', mb).classList.toggle('hidden', k !== 'book');
+    $('#rpScanBox', mb).classList.add('hidden');
     $('#rpTitleBox', mb).classList.toggle('hidden', k !== 'book' && (!!rec || !inv));
     const fd = $('#rpFound', mb);
     if (k === 'book' || !inv) fd.textContent = '';
