@@ -368,6 +368,7 @@ async function applyMerge(plan) {
   else { DB.columns.forEach(c => push(c.key)); rcols.forEach(c => push(c.key)); }
   DB.columns = order.map(k => resultMap.get(k));
   if (useRemoteOrder) DB.colsTs = plan.payload.colsTs;
+  DB.columns = DB.columns.filter(c => !(c.key === 'note' && c.b && !BUILTIN_KEYS.has('note')));
   for (const c of DB.columns) if (c.del) for (const r of DB.records) delete r[c.key];
   for (const b of BUILTIN_COLS) if (!DB.columns.find(c => c.key === b.key)) DB.columns.push({ key: b.key, b: 1, kind: b.kind, names: null, hidden: false, opts: [], mts: 0 });
   DB._byUuid = null;

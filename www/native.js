@@ -36,23 +36,16 @@ const Native = {
   },
   // colour the system-bar areas: top = header / lock colour, bottom = page colour
   paintBars() {
+    if (!this.cap) return;
     let t, b;
     if (document.querySelector('.lockscr, #splash:not(.out)')) { t = '#4A2D17'; b = '#241208'; }
     else {
       const cs = e => e ? getComputedStyle(e).backgroundColor : '';
       const hex = c => { const m = /(\d+)\D+(\d+)\D+(\d+)/.exec(c || ''); return m ? '#' + [1, 2, 3].map(i => (+m[i]).toString(16).padStart(2, '0')).join('') : null; };
       t = hex(cs(document.querySelector('.appbar'))) || '#5B3A1E';
-      b = (getComputedStyle(document.documentElement).getPropertyValue('--bg') || '').trim() || '#F6F1E9';
+      b = hex(cs(document.body)) || hex(getComputedStyle(document.documentElement).getPropertyValue('--bg')) || '#F6F1E9';
     }
     const k = t + b; if (k === this._barKey) return; this._barKey = k;
-    // PIN / splash screens only: paint the safe-area strips under the system bars with the screen colour
-    const lock = !!document.querySelector('.lockscr, #splash:not(.out)');
-    if (lock) {
-      const st = 'max(var(--safe-area-inset-top,0px),env(safe-area-inset-top,0px))';
-      document.documentElement.style.background = `linear-gradient(to bottom, ${t} 0, ${t} ${st}, ${b} ${st}, ${b} 100%)`;
-      document.body.style.background = 'transparent';
-    } else { document.documentElement.style.background = ''; document.body.style.background = ''; }
-    if (!this.cap) return;
     try { const P = this.plugin('MirasBars') || this.cap.registerPlugin('MirasBars'); P.set({ top: t, bottom: b }).catch(e => { this._barKey = null; console.warn('pb', e); }); } catch (e) { this._barKey = null; console.warn('pb', e); }
   },
   initBars() {

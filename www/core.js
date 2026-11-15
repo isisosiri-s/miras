@@ -1,6 +1,6 @@
 'use strict';
 /* Miras core: i18n, utils, crypto, storage, data model */
-const APP_VERSION = '1.1.15';
+const APP_VERSION = '1.1.17';
 const PBKDF_ITER = 250000;
 const TRASH_DAYS = 30;
 
@@ -227,6 +227,8 @@ async function flushSave() {
 function loadDataObj(o) {
   DB.records = o.records || []; DB.columns = o.columns || defaultColumns();
   DB.colsTs = o.colsTs || 0; DB.draft = o.draft || null;
+  // drop the stray 'note' column that 1.1.14 added
+  DB.columns = DB.columns.filter(c => !(c.key === 'note' && c.b && !BUILTIN_KEYS.has('note')));
   // ensure built-ins present
   for (const b of BUILTIN_COLS) if (!DB.columns.find(c => c.key === b.key)) DB.columns.push({ key: b.key, b: 1, kind: b.kind, names: null, hidden: false, opts: [], mts: 0 });
   DB._byUuid = null; DB.rev++;
