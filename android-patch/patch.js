@@ -34,4 +34,43 @@ if (!g.includes('MIRAS_SIGNING')) {
   g += `\n// MIRAS_SIGNING\nandroid {\n    signingConfigs {\n        debug {\n            storeFile file("${'$'}{System.getProperty('user.home')}/.android/debug.keystore")\n            storePassword 'android'\n            keyAlias 'androiddebugkey'\n            keyPassword 'android'\n        }\n    }\n}\n`;
   fs.writeFileSync(gp, g);
 }
+// 5) MainActivity: JS bridge to colour the areas behind the status / navigation bars (top colour, bottom colour)
+{
+  const dir = 'android/app/src/main/java/app/miras/archive', f = dir + '/MainActivity.java';
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(f, `package app.miras.archive;
+
+import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.LayerDrawable;
+import android.graphics.drawable.ColorDrawable;
+import android.view.Gravity;
+import android.webkit.JavascriptInterface;
+import com.getcapacitor.BridgeActivity;
+
+public class MainActivity extends BridgeActivity {
+    @Override
+    public void onStart() {
+        super.onStart();
+        if (getBridge() == null || getBridge().getWebView() == null) return;
+        getBridge().getWebView().addJavascriptInterface(new Object() {
+            @JavascriptInterface
+            public void set(final String top, final String bottom) {
+                runOnUiThread(new Runnable() { public void run() {
+                    try {
+                        int t = Color.parseColor(top), b = Color.parseColor(bottom);
+                        int h = getResources().getDisplayMetrics().heightPixels;
+                        ColorDrawable cb = new ColorDrawable(b), ct = new ColorDrawable(t);
+                        LayerDrawable ld = new LayerDrawable(new android.graphics.drawable.Drawable[] { cb, ct });
+                        ld.setLayerGravity(1, Gravity.TOP);
+                        ld.setLayerHeight(1, h / 2);
+                        getWindow().getDecorView().setBackground(ld);
+                    } catch (Exception e) { }
+                } });
+            }
+        }, "MirasBars");
+    }
+}
+`);
+}
 console.log('android patched');

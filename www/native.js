@@ -34,9 +34,23 @@ const Native = {
     if (light === this._barLight) return; this._barLight = light;
     try { await p.setStyle({ style: light ? 'DARK' : 'LIGHT' }); } catch (e) { console.warn('sb', e); }
   },
+  // colour the system-bar areas: top = header / lock colour, bottom = page colour
+  paintBars() {
+    if (!this.cap || !window.MirasBars) return;
+    let t, b;
+    if (document.querySelector('.lockscr, #splash:not(.out)')) { t = '#4A2D17'; b = '#241208'; }
+    else {
+      const cs = e => e ? getComputedStyle(e).backgroundColor : '';
+      const hex = c => { const m = /(\d+)\D+(\d+)\D+(\d+)/.exec(c || ''); return m ? '#' + [1, 2, 3].map(i => (+m[i]).toString(16).padStart(2, '0')).join('') : null; };
+      t = hex(cs(document.querySelector('.appbar'))) || '#5B3A1E';
+      b = hex(cs(document.body)) || hex(getComputedStyle(document.documentElement).getPropertyValue('--bg')) || '#F6F1E9';
+    }
+    const k = t + b; if (k === this._barKey) return; this._barKey = k;
+    try { MirasBars.set(t, b); } catch (e) { console.warn('pb', e); }
+  },
   initBars() {
-    this._barLight = null; this.syncBar();
-    let q = 0; const run = () => { q = 0; this.syncBar(); };
+    this._barLight = null; this.syncBar(); this.paintBars();
+    let q = 0; const run = () => { q = 0; this.syncBar(); this.paintBars(); };
     new MutationObserver(() => { if (!q) q = requestAnimationFrame(run); }).observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'data-theme'] });
   },
   // back button / minimise
