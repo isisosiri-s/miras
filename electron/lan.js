@@ -1,9 +1,9 @@
 'use strict';
 // Miras Wi-Fi sync server (runs in the Windows app). It only relays encrypted text to the app window;
-// the 6-digit code is the encryption key, so nothing readable travels over the network.
+// the 9-digit code is the encryption key, so nothing readable travels over the network.
 const http = require('http'), os = require('os'), crypto = require('crypto');
 
-const PORT = 47653, MAX_BODY = 300 * 1024 * 1024, IDLE_MS = 15 * 60 * 1000;
+const PORT = 47653, PORT_TRIES = 10, MAX_BODY = 300 * 1024 * 1024, IDLE_MS = 15 * 60 * 1000;
 
 function localIps() {
   const out = [];
@@ -12,7 +12,7 @@ function localIps() {
   }
   return out;
 }
-const newCode = () => String(crypto.randomInt(0, 1000000)).padStart(6, '0');
+const newCode = () => String(crypto.randomInt(0, 1000000000)).padStart(9, '0');
 
 // onRequest(text) -> Promise<{status, body}>; resolves after the app window has merged the data
 function startServer(onRequest, onEvent) {
@@ -49,19 +49,25 @@ function startServer(onRequest, onEvent) {
     }
     send(res, 404, 'no');
   });
-  server.on('error', e => emit('error', { message: String(e && e.code || e) }));
   let stopped = false;
   function stop(why) {
     if (stopped) return; stopped = true; clearTimeout(idle);
     try { server.close(); server.closeAllConnections && server.closeAllConnections(); } catch (_) { /* ignore */ }
     emit('stopped', { why });
   }
+  // first free port from PORT upwards (a busy port is common: second copy, other program)
   return new Promise(resolve => {
-    server.once('error', e => resolve({ error: String(e && e.code || e) }));
-    server.listen(PORT, '0.0.0.0', () => {
-      bump();
-      resolve({ port: PORT, urls: localIps().map(ip => `http://${ip}:${PORT}`), stop });
+    let port = PORT, listening = false;
+    server.on('error', e => {
+      if (listening) return;
+      if (e && e.code === 'EADDRINUSE' && port < PORT + PORT_TRIES - 1) { port++; server.listen(port, '0.0.0.0'); return; }
+      resolve({ error: String(e && e.code || e) });
     });
+    server.on('listening', () => {
+      listening = true; bump();
+      resolve({ port, urls: localIps().map(ip => `http://${ip}:${port}`), stop });
+    });
+    server.listen(port, '0.0.0.0');
   });
 }
 

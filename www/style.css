@@ -22,7 +22,8 @@ svg{display:block}
 #cover{position:fixed;inset:0;z-index:9999;background:linear-gradient(160deg,#4A2D17,#241208);display:none;align-items:center;justify-content:center}
 #cover.on{display:flex}
 /* lock / setup */
-.lockscr{height:100%;overflow:auto;background:linear-gradient(170deg,#4A2D17,#241208);color:#F3E9D6;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px}
+.lockscr{height:100%;overflow:auto;background:linear-gradient(170deg,#4A2D17,#241208);color:#F3E9D6;display:flex;flex-direction:column;align-items:center;justify-content:safe center;padding:24px}
+.lockscr>:first-child{margin-top:auto}.lockscr>:last-child{margin-bottom:auto}
 .lockbox{width:min(100%,360px);display:flex;flex-direction:column;gap:12px}
 .lockbox h1{margin:10px 0 0;text-align:center;font-size:1.9rem;color:#fff}
 .lockbox .sub{text-align:center;color:#CDBB9D;font-size:.85rem;margin-bottom:8px}
@@ -349,3 +350,31 @@ select.inp{appearance:auto}
 /* 1.1.27 it is an app, not a web page: no text selection, except where typing or copying makes sense */
 html,body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 input,textarea,[contenteditable="true"],.lan-url,.lan-code{-webkit-user-select:text;user-select:text}
+
+/* 1.1.28 motion: short, soft, GPU-only (opacity/transform); off with reduced motion, trimmed on weak devices */
+@keyframes fadeOut{to{opacity:0}}
+@keyframes slideDown{to{transform:translateY(100%);opacity:.6}}
+@keyframes sinkOut{to{opacity:0;transform:translateY(10px)}}
+@keyframes rowIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@keyframes routeFwd{from{opacity:0;transform:translateX(22px)}to{opacity:1;transform:none}}
+@keyframes routeBack{from{opacity:0;transform:translateX(-22px)}to{opacity:1;transform:none}}
+@keyframes barSlide{0%{transform:translateX(-100%)}100%{transform:translateX(260%)}}
+@keyframes checkPop{0%{transform:scale(.4)}60%{transform:scale(1.25)}100%{transform:scale(1)}}
+.mb.out{animation:fadeOut .17s ease both;pointer-events:none}
+.mb.out .modal{animation:slideDown .17s ease-in both}
+.toast.out{animation:sinkOut .18s ease both}
+.routefwd{animation:routeFwd .2s cubic-bezier(.2,.8,.2,1) both}
+.routeback{animation:routeBack .2s cubic-bezier(.2,.8,.2,1) both}
+#rows.listin .tr{animation:rowIn .2s ease both}
+.tr{transition:background-color .15s}
+.rp-item,.ib,.nav,.chip,.fab{transition:background-color .15s,transform .12s,box-shadow .15s}
+.rp-item:active{transform:scale(.985);background:var(--row-hl)}
+.ib:active{transform:scale(.9)}
+.fab:active{transform:scale(.92)}
+.sw.on::after,.sw[aria-checked="true"]::after{transition:transform .18s cubic-bezier(.3,1.3,.5,1)}
+.rp-row .ck.on,.tr .scn.on{animation:checkPop .22s ease both}
+.busybox{position:relative;overflow:hidden}
+.busybox::after{content:"";position:absolute;left:0;bottom:0;height:3px;width:40%;background:var(--accent);animation:barSlide 1.1s ease-in-out infinite}
+.lan-code{animation:riseIn .3s ease both}
+html.lite *{will-change:auto!important}
+html.lite #rows.listin .tr,html.lite .routefwd,html.lite .routeback{animation-duration:.01ms}

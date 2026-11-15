@@ -66,7 +66,7 @@ function handleHardwareBack() {
 function toast(msg, ms = 2400) {
   $$('.toast').forEach(e => e.remove());
   const d = document.createElement('div'); d.className = 'toast'; d.textContent = msg; document.body.appendChild(d);
-  setTimeout(() => d.remove(), ms);
+  setTimeout(() => { d.classList.add('out'); setTimeout(() => d.remove(), 180); }, ms);
 }
 // buttons: [{label, v, cls}] -> resolves with v (or null when dismissed)
 function ask({ title, text, html, buttons, onMount, dismiss = true }) {
@@ -80,7 +80,7 @@ function ask({ title, text, html, buttons, onMount, dismiss = true }) {
     let done = false;
     const layer = { onBack: () => { finish(null, true); return true; } };
     const finish = (v, fromBack) => {
-      if (done) return; done = true; mb.remove();
+      if (done) return; done = true; mb.classList.add('out'); setTimeout(() => mb.remove(), 170);
       if (!fromBack) dropLayer(layer).then(() => resolve(v)); else { const i = UI.layers.indexOf(layer); if (i >= 0) UI.layers.splice(i, 1); resolve(v); }
     };
     pushLayer(layer);
@@ -290,7 +290,7 @@ async function setLang(l) {
   mountShell(); UI.layers = layers; if (route !== 'books') { UI.route = route; renderRoute(); }
   if (draft) openCard(draft.isNew ? null : draft.uuid, draft.vals, true);
 }
-function animRoute() { const m = $('#main'); if (!m) return; m.classList.remove('routein'); void m.offsetWidth; m.classList.add('routein'); }
+function animRoute(cls = 'routein') { const m = $('#main'); if (!m) return; m.classList.remove('routein', 'routefwd', 'routeback'); void m.offsetWidth; m.classList.add(cls); }
 function goRoute(r) {
   if (r === UI.route) return;
   if (r === 'books') { if (UI.routeLayer) { const l = UI.routeLayer; UI.routeLayer = null; dropLayer(l); } UI.route = 'books'; renderRoute(); animRoute(); return; }
@@ -407,11 +407,19 @@ function viewBooks(main) {
   $('#tw').addEventListener('scroll', onListScroll, { passive: true }); bindResize(); bindRail();
   const rows = $('#rows');
   rows.addEventListener('click', onRowClick);
-  let lp = null, lpFired = false;
-  rows.addEventListener('touchstart', e => { const tr = e.target.closest('.tr'); if (!tr) return; lpFired = false; lp = setTimeout(() => { lpFired = true; if (navigator.vibrate) navigator.vibrate(20); enterSelMode(tr.dataset.u); }, 480); }, { passive: true });
-  const cancelLp = () => clearTimeout(lp);
+  let lp = null, lpFired = false, lx = 0, ly = 0;
+  const scrolledJustNow = () => Date.now() - (UI.lastScroll || 0) < 200;
+  const cancelLp = () => { clearTimeout(lp); lp = null; };
+  // a touch that only stops a fling, or a finger that slides / scrolls, is never a long press
+  rows.addEventListener('touchstart', e => {
+    const tr = e.target.closest('.tr'); cancelLp(); if (!tr || scrolledJustNow()) return;
+    lpFired = false; const tc = e.touches[0]; lx = tc.clientX; ly = tc.clientY;
+    lp = setTimeout(() => { lp = null; if (scrolledJustNow()) return; lpFired = true; if (navigator.vibrate) navigator.vibrate(20); enterSelMode(tr.dataset.u); }, 480);
+  }, { passive: true });
   rows.addEventListener('touchend', e => { cancelLp(); if (lpFired) { e.preventDefault(); } });
-  rows.addEventListener('touchmove', cancelLp, { passive: true });
+  rows.addEventListener('touchmove', e => { const tc = e.touches[0]; if (tc && (Math.abs(tc.clientX - lx) > 8 || Math.abs(tc.clientY - ly) > 8)) cancelLp(); }, { passive: true });
+  rows.addEventListener('touchcancel', cancelLp, { passive: true });
+  $('#tw').addEventListener('scroll', cancelLp, { passive: true });
   rows.addEventListener('contextmenu', e => { if (e.target.closest('.tr')) e.preventDefault(); });
   bindCellEdit();
   refreshList();
@@ -583,6 +591,7 @@ function refreshList() {
     rows.style.paddingTop = rows.style.paddingBottom = '0px'; v.from = v.to = -1;
     rows.innerHTML = `<div class="empty"><b>${total.total ? t('list_none') : t('list_empty')}</b>${total.total ? '' : t('list_empty_sub')}</div>`;
   } else renderWindow(true);
+  { const k = list.length + ':' + (list[0] && list[0].uuid); if (k !== UI._lk) { UI._lk = k; rows.classList.remove('listin'); void rows.offsetWidth; rows.classList.add('listin'); clearTimeout(UI._lkT); UI._lkT = setTimeout(() => rows.classList.remove('listin'), 320); } }
   renderCounter(list, total); renderBanner(total); renderSelbar(); updateRail();
 }
 function renderCounter(list, total) {

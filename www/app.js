@@ -25,7 +25,9 @@ function onVisibility() {
   }
 }
 
+document.addEventListener('scroll', () => { UI.lastScroll = Date.now(); }, { capture: true, passive: true });
 async function boot() {
+  try { if ((navigator.hardwareConcurrency || 8) <= 4 || (navigator.deviceMemory || 4) <= 2) document.documentElement.classList.add('lite'); } catch (_) { /* ignore */ }
   const t0 = Date.now(), sp = document.getElementById('splash');
   sp.innerHTML = logoSvg(110) + '<b>Miras</b>';
   const hideSplash = () => setTimeout(() => { sp.classList.add('out'); setTimeout(() => sp.remove(), 450); }, Math.max(0, 900 - (Date.now() - t0)));

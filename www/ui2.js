@@ -305,14 +305,14 @@ function lanBlockHtml() {
     if (!LAN.on) return `<div class="sect">${t('lan_title')}</div><div class="hint">${t('lan_pc_hint')}</div><div style="padding:6px 12px"><button class="btn b1" id="lnStart" style="width:100%">${t('lan_wait_btn')}</button>${LAN.last ? lanStatsHtml(LAN.last) : ''}</div>`;
     return `<div class="sect">${t('lan_title')}</div><div class="group lan" style="padding:12px">
       <div class="ss">${t('lan_urls')}</div>${LAN.urls.length ? LAN.urls.map(u => `<div class="lan-url">${esc(u.replace(/^http:\/\//, ''))}</div>`).join('') : `<div class="lan-url">–</div>`}
-      <div class="ss" style="margin-top:8px">${t('lan_code_lbl')}</div><div class="lan-code">${esc(LAN.code)}</div>
+      <div class="ss" style="margin-top:8px">${t('lan_code_lbl')}</div><div class="lan-code">${esc(String(LAN.code).replace(/(\d{3})(?=\d)/g, '$1 '))}</div>
       <div class="ss" style="margin-top:8px">${LAN.last ? t('lan_last', { t: fmtDateTime(LAN.last.at) }) : t('lan_listening')}${LAN.bad ? ` · ${t('lan_bad', { n: LAN.bad })}` : ''}</div>${LAN.last ? lanStatsHtml(LAN.last) : ''}</div>
       <div style="padding:6px 12px"><button class="btn b2" id="lnStop" style="width:100%">${t('lan_stop')}</button></div>`;
   }
   if (!lanClientOk()) return '';
   return `<div class="sect">${t('lan_title')}</div><div class="hint">${t('lan_phone_hint')}</div><div style="padding:0 12px 6px">
     <div class="lbl">${t('lan_addr')}</div><input class="inp" id="lnAddr" inputmode="url" autocomplete="off" placeholder="192.168.1.5:${LAN_PORT}" value="${esc(H.lanAddr || '')}">
-    <div class="lbl" style="margin-top:8px">${t('lan_code')}</div><input class="inp" id="lnCode" inputmode="numeric" autocomplete="off" maxlength="6" placeholder="000000">
+    <div class="lbl" style="margin-top:8px">${t('lan_code')}</div><input class="inp" id="lnCode" inputmode="numeric" autocomplete="off" maxlength="11" placeholder="000 000 000">
     <button class="btn b1" id="lnGo" style="width:100%;margin-top:10px">${t('lan_go')}</button></div>`;
 }
 function bindLan(main) {
@@ -321,9 +321,9 @@ function bindLan(main) {
   if (st) st.onclick = async () => { try { await lanStartPc(); } catch (e) { errToast(e); } viewSync(main); };
   if (sp) sp.onclick = async () => { await lanStopPc(); viewSync(main); };
   if (go) go.onclick = async () => {
-    const addr = $('#lnAddr').value.trim(), code = $('#lnCode').value.trim();
+    const addr = $('#lnAddr').value.trim(), code = $('#lnCode').value.replace(/\s+/g, '');
     if (!addr) { $('#lnAddr').focus(); return; }
-    if (!/^\d{6}$/.test(code)) { toast(t('lan_err_code')); $('#lnCode').focus(); return; }
+    if (!/^\d{9}$/.test(code)) { toast(t('lan_err_code')); $('#lnCode').focus(); return; }
     H.lanAddr = addr; saveHeader();
     let r; try { r = await withBusy(t('lan_working'), () => lanSyncClient(addr, code)); } catch (e) { errToast(e); return; }
     UI.sync = { plan: r.plan, name: 'Wi-Fi', done: true, renum: r.renum, wifi: true }; UI.listKey = ''; viewSync(main);

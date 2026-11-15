@@ -15,8 +15,8 @@ function repBack() {
   const R = UI.rep;
   if (R.sel) { if (R.selOff) R.selOff(); else R.sel = null; return true; }
   if (R.pick) { R.pick = null; renderRoute(); return true; }
-  if (R.m) { R.m = null; renderRoute(); return true; }
-  if (R.f) { R.f = null; renderRoute(); return true; }
+  if (R.m) { R.m = null; renderRoute(); animRoute('routeback'); return true; }
+  if (R.f) { R.f = null; renderRoute(); animRoute('routeback'); return true; }
   return false;
 }
 function repRerender() { const p = $('.page'), y = p ? p.scrollTop : 0; renderRoute(); const q = $('.page'); if (q) q.scrollTop = y; }
@@ -84,7 +84,7 @@ function repShell(main, title, inner, addLabel, onAdd, up) {
   }
   if (up) $('#rpUp').onclick = () => history.back();
 }
-function repEnter(patch) { Object.assign(UI.rep, patch); renderRoute(); animRoute(); const p = $('.page'); if (p) p.scrollTop = 0; }
+function repEnter(patch) { Object.assign(UI.rep, patch); renderRoute(); animRoute('routefwd'); const p = $('.page'); if (p) p.scrollTop = 0; }
 
 // ---------- dialogs ----------
 function repNameDlg(title, val) {
@@ -204,12 +204,12 @@ function repViewMonth(main, f, m) {
   let lp = null, swallow = false;
   box.addEventListener('pointerdown', e => {
     if (e.target.closest('.rp-h') || R.sel) return;
-    const r = e.target.closest('.rp-row'); if (!r) return;
+    const r = e.target.closest('.rp-row'); if (!r || Date.now() - (UI.lastScroll || 0) < 200) return;
     const x0 = e.clientX, y0 = e.clientY;
     const stop = () => { clearTimeout(lp); lp = null; box.removeEventListener('pointermove', mv); box.removeEventListener('pointerup', stop); box.removeEventListener('pointercancel', stop); };
     const mv = ev => { if (Math.abs(ev.clientX - x0) > 10 || Math.abs(ev.clientY - y0) > 10) stop(); };
     box.addEventListener('pointermove', mv); box.addEventListener('pointerup', stop); box.addEventListener('pointercancel', stop);
-    lp = setTimeout(() => { stop(); swallow = true; setTimeout(() => { swallow = false; }, 700); R.sel = new Set([r.dataset.id]); syncSel(); if (navigator.vibrate) try { navigator.vibrate(15); } catch (_) {} }, 450);
+    lp = setTimeout(() => { stop(); if (Date.now() - (UI.lastScroll || 0) < 200) return; swallow = true; setTimeout(() => { swallow = false; }, 700); R.sel = new Set([r.dataset.id]); syncSel(); if (navigator.vibrate) try { navigator.vibrate(15); } catch (_) {} }, 450);
   });
   box.addEventListener('contextmenu', e => e.preventDefault());
   box.addEventListener('click', e => {
