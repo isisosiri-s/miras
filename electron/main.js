@@ -1,4 +1,14 @@
 'use strict';
+// ---- startup log: written FIRST so a silent failure on an old Windows can be diagnosed ----
+const os = require('os');
+const LOG_DIRS = [process.env.PORTABLE_EXECUTABLE_DIR, process.env.USERPROFILE && require('path').join(process.env.USERPROFILE, 'Desktop'), os.tmpdir()].filter(Boolean);
+function log(...a) {
+  const line = new Date().toISOString() + ' ' + a.map(x => (x && x.stack) || (typeof x === 'object' ? JSON.stringify(x) : String(x))).join(' ') + '\n';
+  for (const d of LOG_DIRS) { try { require('fs').appendFileSync(require('path').join(d, 'miras-log.txt'), line); return; } catch (_) { /* next dir */ } }
+}
+process.on('uncaughtException', e => { log('uncaughtException', e); });
+process.on('unhandledRejection', e => { log('unhandledRejection', e); });
+log('--- start', 'miras electron', process.versions.electron, 'chrome', process.versions.chrome, 'node', process.versions.node, '| win', os.release(), process.arch, '| argv', process.argv.join(' '));
 const { app, BrowserWindow, ipcMain, dialog, Menu, screen } = require('electron');
 const path = require('path'), fs = require('fs');
 
@@ -94,13 +104,20 @@ function createWindow() {
   Menu.setApplicationMenu(null);
   win.webContents.on('will-navigate', e => e.preventDefault());
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  win.webContents.on('did-fail-load', (_e, c, d) => log('did-fail-load', c, d));
+  win.on('closed', () => log('window closed'));
   win.loadFile(path.join(__dirname, '../www/index.html'));
-  win.webContents.once('did-finish-load', () => { load(); showNotice(); }); // surface a database problem right away
+  log('window created');
+  win.webContents.once('did-finish-load', () => { log('page loaded'); load(); showNotice(); }); // surface a database problem right away
 }
+app.disableHardwareAcceleration(); // old GPU drivers / Windows builds: software rendering is plenty for this UI
+app.on('child-process-gone', (_e, d) => log('child-process-gone', d));
+app.on('render-process-gone', (_e, _w, d) => log('render-process-gone', d));
 const lock = app.requestSingleInstanceLock();
+log('single-instance lock', lock);
 if (!lock) app.quit();
 else {
   app.on('second-instance', () => { const w = BrowserWindow.getAllWindows()[0]; if (w) { if (w.isMinimized()) w.restore(); w.focus(); } });
-  app.whenReady().then(createWindow);
+  app.whenReady().then(() => { log('ready'); createWindow(); }).catch(e => log('ready failed', e));
   app.on('window-all-closed', () => app.quit());
 }

@@ -74,8 +74,13 @@ jobs:
           sed -i "s/const APP_VERSION = '[^']*'/const APP_VERSION = '${{ github.event.inputs.version }}'/" www/core.js
           npm install --no-audit --no-fund
           npx electron-builder --win portable --x64 --publish never
+          npx electron-builder --win dir --x64 --publish never
+          printf '@echo off\r\n"%%~dp0Miras.exe" --enable-logging --log-file="%%~dp0chromium.log" --v=1\r\npause\r\n' > dist/win-unpacked/Miras-debug.bat
+          powershell -Command "Compress-Archive -Path dist/win-unpacked/* -DestinationPath dist/Miras-win.zip"
           ls dist
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ github.event.inputs.version }}
-          files: dist/Miras.exe
+          files: |
+            dist/Miras.exe
+            dist/Miras-win.zip
