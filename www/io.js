@@ -14,7 +14,7 @@ async function saveFile(name, blob) {
     catch (e) { console.warn('save', e); toast(t('save_fail'), 5000); return false; }
     // Share rejects when the user closes the share sheet
     const share = async () => { try { await cap.Plugins.Share.share({ title: name, url: res.uri, dialogTitle: name }); return true; } catch (e) { console.warn('share', e); return false; } };
-    const how = await ask({ title: name, buttons: [{ label: t('save_dev'), v: 'save', cls: 'b1' }, { label: t('save_share'), v: 'share', cls: 'b2' }, { label: t('btn_cancel'), v: null, cls: 'bd' }] });
+    const how = await ask({ title: name, sheet: true, buttons: [{ label: t('save_dev'), v: 'save', cls: 'b1' }, { label: t('save_share'), v: 'share', cls: 'b2' }, { label: t('btn_cancel'), v: null, cls: 'bd' }] });
     if (how === 'share') return share();
     if (how === 'save') {
       let P = cap.Plugins.MirasFiles; try { P = P || cap.registerPlugin('MirasFiles'); } catch (e) { }

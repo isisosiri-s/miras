@@ -6,8 +6,11 @@ const IC = {
   sync: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 15.5-6.2L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15.5 6.2L3 16"/><path d="M3 21v-5h5"/></svg>',
   menu: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>',
   search: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#8a7a66" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>',
-  ok: (s = 22, c = '#1A8F3C') => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6"/></svg>`,
-  no: (s = 22, c = '#D32F2F') => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="3" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>`,
+  // default colours follow the theme (--ok / --bad) instead of fixed hex values
+  ok: (s = 22, c) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c || 'currentColor'}"${c ? '' : ' style="color:var(--ok)"'} stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6"/></svg>`,
+  no: (s = 22, c) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c || 'currentColor'}"${c ? '' : ' style="color:var(--bad)"'} stroke-width="3" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>`,
+  // "not done yet" (not scanned / not restored): a normal state, so a neutral empty circle — red is kept for errors
+  off: (s = 22) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" style="color:var(--outline)" stroke-width="2.2"><circle cx="12" cy="12" r="8"/></svg>`,
   plus: '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
   warn: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:1px"><path d="M12 3l10 18H2L12 3z"/><path d="M12 10v5M12 18h.01"/></svg>',
   trash: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>',
@@ -26,6 +29,13 @@ const IC = {
   trashn: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>',
   close: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
   edit: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16v4z"/></svg>',
+  // reports: same line style as the rest of the set (emoji looked different on every phone)
+  folder: '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>',
+  folderOpen: '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17V7a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v1"/><path d="M3 17l2.4-6.2A2 2 0 0 1 7.3 9.5H21l-2.6 7.2a2 2 0 0 1-1.9 1.3H5a2 2 0 0 1-2-1z"/></svg>',
+  dots: '<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><circle cx="5.5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="18.5" cy="12" r="1.8"/></svg>',
+  drag: '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg>',
+  sort: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4v16M3.5 7.5L7 4l3.5 3.5M17 20V4M13.5 16.5L17 20l3.5-3.5"/></svg>',
+  select: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="17" height="17" rx="3"/><path d="M8 12.5l3 3 5-6"/></svg>',
   chev: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg>',
   file: '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#1A8F3C" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M9 13l4 5M13 13l-4 5"/></svg>',
   finger: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 11v4a6 6 0 0 1-1 3M8 11a4 4 0 0 1 8 0v3M5 12a7 7 0 0 1 14 0v2M9 15c0 2-.5 3.500-1.500 5"/></svg>',
@@ -69,10 +79,13 @@ function toast(msg, ms = 2400) {
   setTimeout(() => { d.classList.add('out'); setTimeout(() => d.remove(), 180); }, ms);
 }
 // buttons: [{label, v, cls}] -> resolves with v (or null when dismissed)
-function ask({ title, text, html, buttons, onMount, dismiss = true }) {
+// Material: a confirmation / alert (text + up to 3 buttons) is a centred dialog; option lists and forms stay bottom sheets.
+// `sheet: true` forces a bottom sheet (a choice menu), `center: true` forces a centred dialog.
+function ask({ title, text, html, buttons, onMount, dismiss = true, sheet = false, center }) {
   return new Promise(resolve => {
-    const mb = document.createElement('div'); mb.className = 'mb';
     const bl = buttons || [{ label: t('ok'), v: true, cls: 'b1' }];
+    const centred = center !== undefined ? !!center : (!sheet && !html && !onMount && bl.length <= 3);
+    const mb = document.createElement('div'); mb.className = 'mb' + (centred ? ' center' : '');
     const stack = bl.length >= 4 || (bl.length >= 3 && bl.some(b => String(b.label).length > 16));
     const btns = bl.map((b, i) => `<button class="btn ${b.cls || 'b2'}" data-i="${i}">${esc(b.label)}</button>`).join('');
     mb.innerHTML = `<div class="modal" role="dialog">${title ? `<h3>${esc(title)}</h3>` : ''}${text ? `<p>${esc(text)}</p>` : ''}${html || ''}<div class="btns${stack ? ' stack' : ''}">${btns}</div></div>`;
@@ -427,7 +440,7 @@ function viewBooks(main) {
 function renderChips() {
   const c = $('#chips'); if (!c) return;
   const rf = H.rest && H.restUi, nf = Object.keys(UI.colf || {}).length;
-  c.innerHTML = [['all', t('f_all')], ['scanned', IC.ok(14) + t('f_scanned')], ['not', IC.no(14) + t('f_notscanned')], ...(rf ? [['rest', IC.ok(14) + t('f_rest')], ['notrest', IC.no(14) + t('f_notrest')]] : []), ['recent', t('f_recent')]].map(([k, l]) => `<button class="chip ${UI.filter === k ? 'on' : ''}" data-f="${k}">${l}</button>`).join('') + (nf ? `<button class="chip clr" data-f="__clr">${IC.no(14)}${t('f_clear_cols', { n: nf })}</button>` : '');
+  c.innerHTML = [['all', t('f_all')], ['scanned', IC.ok(14) + t('f_scanned')], ['not', IC.off(14) + t('f_notscanned')], ...(rf ? [['rest', IC.ok(14) + t('f_rest')], ['notrest', IC.off(14) + t('f_notrest')]] : []), ['recent', t('f_recent')]].map(([k, l]) => `<button class="chip ${UI.filter === k ? 'on' : ''}" data-f="${k}">${l}</button>`).join('') + (nf ? `<button class="chip clr" data-f="__clr">${IC.no(14)}${t('f_clear_cols', { n: nf })}</button>` : '');
   $$('.chip', c).forEach(b => b.onclick = () => { if (b.dataset.f === '__clr') UI.colf = {}; else UI.filter = b.dataset.f; renderChips(); refreshList(); const w = $('#tw'); if (w) w.scrollTop = 0; });
 }
 function rowHtml(r, cols, tpl) {
@@ -436,7 +449,7 @@ function rowHtml(r, cols, tpl) {
   const cb = (isWide() || UI.selMode) ? `<span class="cbc${stk(SL, 'cb')}" data-cb="1"><b class="cb ${sel ? 'on' : ''}">${sel ? IC.ok(14, '#fff') : ''}</b></span>` : '';
   const cells = cols.map(c => {
     if (c.kind === 'id') return `<span class="idc${stk(SL, 'id')}"><i>${r.id}</i></span>`;
-    if (c.kind === 'check') return `<span class="mid">${r[c.key] ? IC.ok(20) : IC.no(20)}</span>`;
+    if (c.kind === 'check') return `<span class="mid">${r[c.key] ? IC.ok(20) : IC.off(20)}</span>`;
     if (c.kind === 'number') return `<span class="num"><i>${esc(cellText(c, r))}</i></span>`;
     return `<span class="${c.key === 'inv' ? 'inv' + stk(SL, 'inv') : 'tx'}"><i>${esc(cellText(c, r))}</i></span>`;
   }).join('');
@@ -655,7 +668,7 @@ function fieldInputHtml(c, val, id, opt = {}) {
   if (c.kind === 'check') {
     const on = !!val;
     const lOn = c.key === 'restored' ? t('rest_card') : (opt.label || colName(c, true)), lOff = c.key === 'restored' ? t('rest_card_off') : lOn;
-    return `<button type="button" class="scanrow ${on ? 'on' : 'off'}" id="${id}" data-check="${on ? 1 : 0}"><span class="bx">${on ? IC.ok(16) : ''}</span><span class="lt" data-on="${esc(lOn)}" data-off="${esc(lOff)}">${esc(on ? lOn : lOff)}</span><span class="rt">${on ? IC.ok(22) : IC.no(22)}</span></button>`;
+    return `<button type="button" class="scanrow ${on ? 'on' : 'off'}" id="${id}" data-check="${on ? 1 : 0}"><span class="bx">${on ? IC.ok(16) : ''}</span><span class="lt" data-on="${esc(lOn)}" data-off="${esc(lOff)}">${esc(on ? lOn : lOff)}</span><span class="rt">${on ? IC.ok(22) : IC.off(22)}</span></button>`;
   }
   if (c.kind === 'type') return `<select class="inp" id="${id}"><option value="">${esc(t('opt_none'))}</option>${['manuscript', 'printed'].map(k => `<option value="${k}" ${v === k ? 'selected' : ''}>${esc(t('type_' + k))}</option>`).join('')}</select>`;
   if (c.kind === 'list') return `<select class="inp" id="${id}"><option value="">${esc(t('opt_none'))}</option>${(c.opts || []).concat(v && !(c.opts || []).includes(v) ? [v] : []).map(o => `<option ${v === o ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select>`;
@@ -668,7 +681,7 @@ function bindCheckButtons(root) {
   $$('[data-check]', root).forEach(b => b.onclick = () => {
     const on = b.dataset.check !== '1'; b.dataset.check = on ? 1 : 0;
     b.className = 'scanrow ' + (on ? 'on' : 'off');
-    $('.bx', b).innerHTML = on ? IC.ok(16) : ''; $('.rt', b).innerHTML = on ? IC.ok(22) : IC.no(22);
+    $('.bx', b).innerHTML = on ? IC.ok(16) : ''; $('.rt', b).innerHTML = on ? IC.ok(22) : IC.off(22);
     const lt = $('.lt', b); if (lt) lt.textContent = on ? lt.dataset.on : lt.dataset.off;
     b.dispatchEvent(new Event('input', { bubbles: true }));
   });
@@ -708,7 +721,7 @@ function cardCols() {
 }
 const cardTitleOf = (isNew, type) => t((isNew ? 'card_new' : 'card_title') + (type === 'manuscript' || type === 'printed' ? '_' + type : ''));
 async function addRecord() {
-  const v = await ask({ title: t('add_what'), buttons: [{ label: t('type_manuscript'), v: 'manuscript', cls: 'b1' }, { label: t('type_printed'), v: 'printed', cls: 'b1' }, { label: t('btn_cancel'), v: null, cls: 'b2' }] });
+  const v = await ask({ title: t('add_what'), sheet: true, buttons: [{ label: t('type_manuscript'), v: 'manuscript', cls: 'b1' }, { label: t('type_printed'), v: 'printed', cls: 'b1' }, { label: t('btn_cancel'), v: null, cls: 'b2' }] });
   if (v) openCard(null, undefined, false, v);
 }
 function cardDefaults() {
@@ -747,7 +760,7 @@ async function openCard(uuid, draftVals, silentRerender, presetType) {
   }).join('');
   host.innerHTML = `<div class="cardhead"><button class="ib backb" id="cBack">${IC.back}</button><h3 id="cTitle">${cardTitleOf(isNew, vals.type)}</h3>${!isNew ? `<button class="ib" id="cDel" aria-label="${esc(t('btn_delete'))}">${IC.trash}</button>` : ''}<button class="ib only-wide" id="cX">${IC.close}</button></div>
     <div class="cardbody" id="cBody">${body}<div class="warn hidden" id="dupWarn">${IC.warn}<span></span></div></div>
-    <div class="actions"><button class="btn b2" id="cCancel">${t('btn_cancel')}</button>${isNew ? `<button class="btn b3" id="cNext">${t('card_save_next')}</button>` : ''}<button class="btn b1" id="cSave">${t('btn_save')}</button></div>`;
+    <div class="actions"><!-- no Cancel: the back arrow (and X on PC) already leaves the card -->${isNew ? `<button class="btn b2" id="cNext">${t('card_save_next')}</button>` : ''}<button class="btn b1" id="cSave">${t('btn_save')}</button></div>`;
   host.classList.add('on'); $('#shell').classList.add('hascard');
   bindCheckButtons(host);
   UI.card.init = JSON.stringify(readCard());
@@ -755,7 +768,6 @@ async function openCard(uuid, draftVals, silentRerender, presetType) {
   { const tt = $('#f_type', host); if (tt) tt.addEventListener('change', () => { $('#cTitle').textContent = cardTitleOf(UI.card.isNew, tt.value); }); }
   $('#cBack').onclick = () => history.back();
   $('#cX').onclick = () => closeCard(false);
-  $('#cCancel').onclick = () => closeCard(false);
   $('#cSave').onclick = () => saveCard(false);
   if ($('#cNext')) $('#cNext').onclick = () => saveCard(true);
   if ($('#cDel')) $('#cDel').onclick = async () => { if (await confirmDlg(t('card_del_confirm'), t('btn_delete'), true)) { const r = UI.card.rec; closeCard(true); trashRecords([r]); toast(t('toast_trashed', { n: 1 })); refreshList(); } };

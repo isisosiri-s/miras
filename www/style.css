@@ -1,14 +1,17 @@
 :root{
   --bg:#F6F1E9;--surface:#fff;--surface2:#EFE6D6;--border:#DCCFB8;--text:#2B2118;--muted:#6B5A46;
   --bar:#5B3A1E;--bar-text:#fff;--accent:#8A5A2B;--accent-text:#fff;--chip:#E4D7C3;--row-hl:#F5EBD8;--row-sel:#EFE3CC;
-  --ok:#1A8F3C;--okbg:#E4F4E8;--bad:#D32F2F;--badbg:#FBE9E7;--warnbg:#FFF3CD;--warnbd:#E0C36B;--warntx:#5C4300;
+  --ok:#147A33;--okbg:#E4F4E8;--on-ok:#fff;--bad:#B3261E;--badbg:#FBE9E7;--warnbg:#FFF3CD;--warnbd:#E0C36B;--warntx:#5C4300;
   --chipon:#5B3A1E;--chipon-text:#fff;--side:#3E2412;--side-text:#EADFCB;--shadow:0 10px 30px rgba(43,33,24,.28);
+  /* --outline: borders of controls (inputs, switches, empty circles) — at least 3:1 against every surface */
+  --outline:#8C7A63;--bd-l:#E8D9F0;--bd-b:#D8E8F0;--bd-o:#E4E0D6;--bd-text:#2B2118;
 }
 :root[data-theme=dark]{
   --bg:#1C1712;--surface:#262019;--surface2:#30281F;--border:#47392A;--text:#EFE6D6;--muted:#B5A58C;
   --bar:#3A2515;--bar-text:#F3E9D6;--accent:#B8802F;--accent-text:#1C1208;--chip:#3A2F22;--row-hl:#32281C;--row-sel:#3B2F1E;
-  --ok:#4CC26D;--okbg:#1E3324;--bad:#F06A60;--badbg:#3B2220;--warnbg:#3D3317;--warnbd:#8A7326;--warntx:#F0DC9A;
+  --ok:#4CC26D;--okbg:#1E3324;--on-ok:#1C1208;--bad:#F06A60;--badbg:#3B2220;--warnbg:#3D3317;--warnbd:#8A7326;--warntx:#F0DC9A;
   --chipon:#B8802F;--chipon-text:#1C1208;--side:#150F0A;--side-text:#D8CBB3;--shadow:0 10px 30px rgba(0,0,0,.5);
+  --outline:#8A7760;--bd-l:#4A3A55;--bd-b:#2F4452;--bd-o:#4A443A;--bd-text:#F3E9D6;
 }
 html{font-size:16px}html[data-font=s]{font-size:14px}html[data-font=l]{font-size:18.5px}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -384,3 +387,63 @@ html.lite #rows.listin .tr,html.lite .routefwd,html.lite .routeback{animation-du
 @media (min-width:700px){.rp-cards{grid-template-columns:repeat(4,1fr)}}
 .rp-row .bd.o,.rp-pr .bd.o{background:#E4E0D6;color:#2B2118}
 [data-theme=dark] .rp-row .bd.o,[data-theme=dark] .rp-pr .bd.o{background:#4A443A;color:#F3E9D6}
+
+/* 1.1.37 design pass (Android / Material rules): 48dp touch targets, 3:1 control borders, 4.5:1 text,
+   neutral "not done yet" state, no text under 12px, dark-theme report badges */
+/* -- touch targets: controls are 48px tall, or get an invisible 48px hit area around the visible shape -- */
+.ib{width:48px;height:48px;border-radius:24px}
+.search input,.inp{height:48px}
+.search svg{top:14px}
+.sbtn{height:48px}
+.seg button{height:42px} /* + 3px track padding = 48 */
+.acts button{height:44px}
+.rp-dots{width:48px;height:48px;border-radius:24px}
+.rp-tools .btn{height:48px}
+.colrow .ib{width:42px}
+.fcol select{height:40px;max-width:150px}
+.th{height:44px}
+.th .rz{width:24px}
+.chips{padding:4px 0;margin:-4px 0} /* room for the chips' hit area inside the scrolling row */
+.chip{height:40px}
+.selbar .sb{height:40px}
+.counter .jmp{height:32px;border-radius:16px;font-size:.75rem}
+.langrow button{min-height:32px}
+.chip,.selbar .sb,.lchip,.banner .sbtn,.counter .jmp,.langrow button,.acts button{position:relative}
+.chip::before,.selbar .sb::before,.lchip::before,.banner .sbtn::before,.counter .jmp::before,.langrow button::before,.acts button::before{content:'';position:absolute;left:50%;top:50%;width:max(100%,48px);height:max(100%,48px);transform:translate(-50%,-50%)}
+@media (orientation:landscape) and (max-height:520px){ /* phone in landscape keeps its compact header */
+  .th{height:32px}.selbar .sb{height:30px}.rp-tools .btn{height:36px}
+}
+/* -- control borders 3:1 (inputs, switches, empty circles) -- */
+.inp,.search input,.fcol select{border-color:var(--outline)}
+.inp.err{border-color:var(--bad)}
+.sw{background:var(--surface2);box-shadow:inset 0 0 0 2px var(--outline)}
+.sw::after{background:var(--outline);left:6px;top:6px;width:18px;height:18px}
+.sw.on{background:var(--ok);box-shadow:none}
+.sw.on::after{background:var(--on-ok);left:23px;top:3px;width:24px;height:24px}
+.sc.n,.chk{border-color:var(--outline)}
+.sc.y{color:var(--on-ok)}
+.chip.on svg{color:var(--chipon-text)!important} /* the green tick would vanish on the dark "on" chip */
+/* -- "not scanned / not restored" is a normal state: neutral instead of the error red -- */
+.scanrow.off{background:var(--surface);border-color:var(--outline);color:var(--text)}
+/* -- the FAB must not cover the last row -- */
+@media (max-width:899px){#rows::after{content:'';display:block;height:88px}}
+/* -- no text smaller than 12px (0.75rem at the default size) -- */
+.rp-row .bd,.rp-pr .bd,.rp-q i{font-size:.72rem}
+.th,.tile span,.badge,.pill,.rp-c .l,.rp-c .s,.fcol .st,.rp-t span,.rp-tot .s,.rp-hint,.trrow .nm span{font-size:.75rem}
+/* -- report badges: theme colours (the light pastels were kept in the dark theme) -- */
+.rp-row .bd.l,.rp-pr .bd.l{background:var(--bd-l);color:var(--bd-text)}
+.rp-row .bd.b,.rp-pr .bd.b{background:var(--bd-b);color:var(--bd-text)}
+.rp-row .bd.o,.rp-pr .bd.o,[data-theme=dark] .rp-row .bd.o,[data-theme=dark] .rp-pr .bd.o{background:var(--bd-o);color:var(--bd-text)}
+/* -- confirmations / alerts: centred Material dialog (option lists and forms stay bottom sheets) -- */
+.mb.center{align-items:center;padding:24px 16px}
+.mb.center .modal{border-radius:24px;max-width:400px;padding:22px 20px 18px;animation:dlgIn .2s cubic-bezier(.2,.8,.2,1) both}
+.mb.center.out .modal{animation:dlgOut .15s ease-in both}
+@keyframes dlgIn{from{opacity:0;transform:scale(.92)}to{opacity:1;transform:none}}
+@keyframes dlgOut{to{opacity:0;transform:scale(.95)}}
+/* -- card actions: one filled "Save", "Save and add next" tonal; normal readable text size -- */
+.actions .btn{height:auto;min-height:48px;font-size:.95rem;padding:8px 14px;line-height:1.2}
+/* -- report icons (SVG instead of emoji / text glyphs) -- */
+.rp-ic{color:var(--accent);display:flex;flex:none}
+.rp-dots{display:flex;align-items:center;justify-content:center}
+.rp-tools .btn{gap:6px}
+#cNext{flex:1.7 1 0}#cSave{flex:1 1 0} /* the long "Save and add next" label gets the room, so it wraps to at most two lines */

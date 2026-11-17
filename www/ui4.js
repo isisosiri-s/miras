@@ -108,7 +108,7 @@ function repNameDlg(title, val) {
 function repViewFolders(main) {
   const rows = DB.reports.map(f => {
     const n = f.months.reduce((a, m) => a + m.rows.length, 0);
-    return `<div class="rp-item" data-f="${f.id}"><span class="rp-h" aria-hidden="true">⋮⋮</span><span class="rp-ic">📁</span><div class="rp-tx"><div class="n">${esc(f.name)}</div><div class="s">${f.months.length ? t('rep_folder_sub', { m: f.months.length, n }) : t('rep_empty')}</div></div><button class="rp-dots" data-fm="${f.id}" aria-label="…">⋯</button><span class="chev">${IC.chev}</span></div>`;
+    return `<div class="rp-item" data-f="${f.id}"><span class="rp-h" aria-hidden="true">${IC.drag}</span><span class="rp-ic">${IC.folder}</span><div class="rp-tx"><div class="n">${esc(f.name)}</div><div class="s">${f.months.length ? t('rep_folder_sub', { m: f.months.length, n }) : t('rep_empty')}</div></div><button class="rp-dots" data-fm="${f.id}" aria-label="…">${IC.dots}</button><span class="chev">${IC.chev}</span></div>`;
   }).join('');
   const R = UI.rep, hasRows = DB.reports.some(f => f.months.some(m => m.rows.length));
   const listHtml = `<div class="rp-list" id="rpFl">${rows || `<div class="empty"><b>${t('rep_empty')}</b></div>`}</div>`;
@@ -129,7 +129,7 @@ function repViewFolders(main) {
     const d = e.target.closest('[data-fm]');
     if (d) {
       e.stopPropagation(); const f = repFolder(d.dataset.fm); if (!f) return;
-      const v = await ask({ title: f.name, buttons: [{ label: t('rep_rename'), v: 'ren', cls: 'b2' }, { label: t('btn_delete'), v: 'del', cls: 'bad' }, { label: t('btn_cancel'), v: null, cls: 'bd' }] });
+      const v = await ask({ title: f.name, sheet: true, buttons: [{ label: t('rep_rename'), v: 'ren', cls: 'b2' }, { label: t('btn_delete'), v: 'del', cls: 'bad' }, { label: t('btn_cancel'), v: null, cls: 'bd' }] });
       if (v === 'ren') { const nm = await repNameDlg(t('rep_rename'), f.name); if (nm) { f.name = nm; f.ts = Date.now(); scheduleSave(); renderRoute(); } }
       else if (v === 'del' && await confirmDlg(t('rep_del_folder', { n: f.name }), t('btn_delete'), true)) { DB.reports = DB.reports.filter(x => x !== f); repTomb(f.id); scheduleSave(); renderRoute(); }
       return;
@@ -143,7 +143,7 @@ function repViewMonths(main, f) {
   const ms = [...f.months].sort((a, b) => b.m - a.m);
   const rows = ms.map(m => {
     const s = repStats(m);
-    return `<div class="rp-item" data-m="${m.id}"><span class="rp-ic">📂</span><div class="rp-tx"><div class="n">${esc(repMonthName(m.m))}</div><div class="s">${s.n ? REP_KINDS.filter(k => s.by[k].n).map(k => s.by[k].n + ' ' + t('rep_ab_' + k)).join(' · ') : t('rep_empty')}</div></div><button class="rp-dots" data-md="${m.id}" aria-label="…">⋯</button><span class="chev">${IC.chev}</span></div>`;
+    return `<div class="rp-item" data-m="${m.id}"><span class="rp-ic">${IC.folderOpen}</span><div class="rp-tx"><div class="n">${esc(repMonthName(m.m))}</div><div class="s">${s.n ? REP_KINDS.filter(k => s.by[k].n).map(k => s.by[k].n + ' ' + t('rep_ab_' + k)).join(' · ') : t('rep_empty')}</div></div><button class="rp-dots" data-md="${m.id}" aria-label="…">${IC.dots}</button><span class="chev">${IC.chev}</span></div>`;
   }).join('');
   const fs = repStats(f.months), kc = k => `<div class="rp-c"><div class="l">${esc(t('rep_c_' + k))}</div><div class="v">${fs.by[k].n}</div><div class="s">${fmtNum(fs.by[k].l)} ${esc(t('rep_leaves').toLowerCase())}</div></div>`;
   const total = f.months.length ? `<div class="rp-cards">${REP_KINDS.map(kc).join('')}</div>` : '';
@@ -174,14 +174,14 @@ function repRowHtml(row) {
   const rec = repRec(row), sc = repRowScanned(row), title = repRowTitle(row);
   const sub = repManual(row.kind) ? t('rep_manual') : (row.inv ? `${t('rep_inv')} ${esc(row.inv)}${rec ? '' : ` · ${t('rep_not_in_archive')}`}` : '');
   const lv = row.leaves === '' || row.leaves == null ? '–' : fmtNum(repLeavesOf(row.leaves));
-  return `<div class="rp-row" data-id="${row.id}"><span class="rp-h" aria-hidden="true">⋮⋮</span><span class="chk">✓</span><span class="bd ${repBadge(row.kind)}">${esc(repKindLabel(row.kind).slice(0, 5).toUpperCase())}</span><div class="rp-t"><b>${esc(title) || '–'}</b><span>${sub}</span></div><div class="rp-q">${lv}<i>${esc(t('rep_leaves').toLowerCase())}</i></div><span class="sc ${sc ? 'y' : 'n'}">✓</span></div>`;
+  return `<div class="rp-row" data-id="${row.id}"><span class="rp-h" aria-hidden="true">${IC.drag}</span><span class="chk">✓</span><span class="bd ${repBadge(row.kind)}">${esc(repKindLabel(row.kind).slice(0, 5).toUpperCase())}</span><div class="rp-t"><b>${esc(title) || '–'}</b><span>${sub}</span></div><div class="rp-q">${lv}<i>${esc(t('rep_leaves').toLowerCase())}</i></div><span class="sc ${sc ? 'y' : 'n'}">✓</span></div>`;
 }
 function repViewMonth(main, f, m) {
   const R = UI.rep; R.sel = null; R.selOff = null;
   const s = repStats(m);
   const card = k => `<div class="rp-c"><div class="l">${esc(t('rep_c_' + k))}</div><div class="v">${s.by[k].n}</div><div class="s">${fmtNum(s.by[k].l)} ${esc(t('rep_leaves').toLowerCase())}</div></div>`;
   const inner = `<div class="rp-cards">${REP_KINDS.map(card).join('')}</div>
-    <div class="rp-tools"><button class="btn b2" id="rpSort">⇅ ${esc(t('rep_sort_type'))}</button><button class="btn b2" id="rpSel">☑ ${esc(t('rep_select'))}</button><button class="btn b1" id="rpArc">+ ${esc(t('rep_from_archive'))}</button></div>
+    <div class="rp-tools"><button class="btn b2" id="rpSort">${IC.sort}${esc(t('rep_sort_type'))}</button><button class="btn b2" id="rpSel">${IC.select}${esc(t('rep_select'))}</button><button class="btn b1" id="rpArc">${IC.plus.replace('width="26" height="26"', 'width="18" height="18"')}${esc(t('rep_from_archive'))}</button></div>
     <div id="rpRows">${m.rows.length ? m.rows.map(repRowHtml).join('') : `<div class="empty">${esc(t('rep_list_empty'))}</div>`}</div>
     <div class="rp-bar hidden" id="rpSelBar"><button class="btn b2" id="rpSCancel">${esc(t('btn_cancel'))}</button><button class="btn b2" id="rpSAll"></button><button class="btn bad" id="rpSDel"></button></div>`;
   repShell(main, `${f.name} · ${repMonthName(m.m)}`, inner, t('rep_add'), () => repRowDlg(f, m, null), true);
@@ -410,5 +410,5 @@ async function repPickAdd(f, m0, R) {
   scheduleSave();
   UI.rep.pick = null; renderRoute();
   const p = x => `<p>${x}</p>`;
-  await ask({ title: t('rep_result', { a: added, n: recs.length }), html: p(esc(t('rep_res_scan', { a: sc, b: ns }))) + (H.rest ? p(esc(t('rep_res_rest', { a: rs, b: nrs }))) : '') + (skipped ? `<p class="rp-s">${esc(t('rep_skipped', { n: skipped }))}</p>` : ''), buttons: [{ label: t('ok'), v: true, cls: 'b1' }] });
+  await ask({ title: t('rep_result', { a: added, n: recs.length }), center: true, html: p(esc(t('rep_res_scan', { a: sc, b: ns }))) + (H.rest ? p(esc(t('rep_res_rest', { a: rs, b: nrs }))) : '') + (skipped ? `<p class="rp-s">${esc(t('rep_skipped', { n: skipped }))}</p>` : ''), buttons: [{ label: t('ok'), v: true, cls: 'b1' }] });
 }
