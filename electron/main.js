@@ -1,10 +1,18 @@
 'use strict';
 // ---- startup log: written FIRST so a silent failure on an old Windows can be diagnosed ----
 const os = require('os');
-const LOG_DIRS = [process.env.PORTABLE_EXECUTABLE_DIR, process.env.USERPROFILE && require('path').join(process.env.USERPROFILE, 'Desktop'), os.tmpdir()].filter(Boolean);
+// log lives in the program's data folder (%APPDATA%/Miras) next to the database, not on the desktop; the old places are only fallbacks
+const LOG_DIRS = [process.env.APPDATA && require('path').join(process.env.APPDATA, 'Miras'), process.env.PORTABLE_EXECUTABLE_DIR, os.tmpdir()].filter(Boolean);
 function log(...a) {
-  const line = new Date().toISOString() + ' ' + a.map(x => (x && x.stack) || (typeof x === 'object' ? JSON.stringify(x) : String(x))).join(' ') + '\n';
-  for (const d of LOG_DIRS) { try { require('fs').appendFileSync(require('path').join(d, 'miras-log.txt'), line); return; } catch (_) { /* next dir */ } }
+  const fs = require('fs'), line = new Date().toISOString() + ' ' + a.map(x => (x && x.stack) || (typeof x === 'object' ? JSON.stringify(x) : String(x))).join(' ') + '\n';
+  for (const d of LOG_DIRS) {
+    try {
+      fs.mkdirSync(d, { recursive: true });
+      const f = require('path').join(d, 'miras-log.txt');
+      try { if (fs.statSync(f).size > 200 * 1024) fs.renameSync(f, f + '.old'); } catch (_) { /* no log yet */ }
+      fs.appendFileSync(f, line); return;
+    } catch (_) { /* next dir */ }
+  }
 }
 process.on('uncaughtException', e => { log('uncaughtException', e); });
 process.on('unhandledRejection', e => { log('unhandledRejection', e); });
