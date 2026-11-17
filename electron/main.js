@@ -103,7 +103,7 @@ ipcMain.handle('lan:stop', () => { if (lanSrv) { lanSrv.stop('user'); lanSrv = n
 function createWindow() {
   const wa = screen.getPrimaryDisplay().workAreaSize;
   const win = new BrowserWindow({
-    width: Math.min(1280, wa.width), height: Math.min(820, wa.height), minWidth: Math.min(420, wa.width), minHeight: Math.min(600, wa.height),
+    width: Math.min(1280, wa.width), height: Math.min(820, wa.height), minWidth: Math.min(960, wa.width), minHeight: Math.min(600, wa.height),
     backgroundColor: '#F6F1E9', title: 'Miras', icon: path.join(__dirname, '../www/icon-512.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),

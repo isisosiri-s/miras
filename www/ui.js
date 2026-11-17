@@ -87,7 +87,11 @@ function ask({ title, text, html, buttons, onMount, dismiss = true, sheet = fals
     const centred = center !== undefined ? !!center : (!sheet && !html && !onMount && bl.length <= 3);
     const mb = document.createElement('div'); mb.className = 'mb' + (centred ? ' center' : '');
     const stack = bl.length >= 4 || (bl.length >= 3 && bl.some(b => String(b.label).length > 16));
-    const btns = bl.map((b, i) => `<button class="btn ${b.cls || 'b2'}" data-i="${i}">${esc(b.label)}</button>`).join('');
+    // order: Android puts Cancel first (left) and the confirming action right; Windows dialogs put the
+    // confirming action first and Cancel / Close last. data-i keeps the original index either way.
+    let order = bl.map((b, i) => i);
+    if (document.documentElement.classList.contains('pc') && bl.length > 1 && (bl[0].v === null || bl[0].v === false)) order = [...order.slice(1), 0];
+    const btns = order.map(i => { const b = bl[i]; return `<button class="btn ${b.cls || 'b2'}" data-i="${i}">${esc(b.label)}</button>`; }).join('');
     mb.innerHTML = `<div class="modal" role="dialog">${title ? `<h3>${esc(title)}</h3>` : ''}${text ? `<p>${esc(text)}</p>` : ''}${html || ''}<div class="btns${stack ? ' stack' : ''}">${btns}</div></div>`;
     document.body.appendChild(mb);
     let done = false;
@@ -283,7 +287,7 @@ function mountShell() {
   appEl().innerHTML = `<div class="shell" id="shell">
     <aside class="side">
       <div class="brand">${logoSvg(44)}<div><b>Miras</b><span>${t('tagline')}</span></div></div>
-      ${NAV.map(([k, lab, ic]) => `<button class="nav" data-r="${k}">${IC[ic]}<span>${t(lab)}</span></button>`).join('')}
+      ${NAV.map(([k, lab, ic]) => `<button class="nav" data-r="${k}" aria-label="${esc(t(lab))}">${IC[ic]}<span>${t(lab)}</span></button>`).join('')}
       <div class="sp"></div>
       <div class="lg">${['tk', 'ru', 'en'].map(l => `<button data-l="${l}" class="${H.lang === l ? 'on' : ''}">${l.toUpperCase()}</button>`).join('')}</div>
       ${Auth.hasPin() ? `<button class="nav" id="navlock">${IC.lock(20)}<span>${t('nav_lock')}</span></button>` : ''}
@@ -479,7 +483,8 @@ function bindResize() {
 const VBUF = 10;
 UI.sort = null; UI.colf = {};
 UI.vr = { rh: 66, from: -1, to: -1, cols: null, raf: 0 };
-function rowHeightPx() { return Math.round(parseFloat(getComputedStyle(document.documentElement).fontSize) * 4.1); }
+// row height = font size x --row-em (4.1 on phones: two-line titles, big touch rows; denser on the Windows app)
+function rowHeightPx() { const cs = getComputedStyle(document.documentElement); return Math.round(parseFloat(cs.fontSize) * (parseFloat(cs.getPropertyValue('--row-em')) || 4.1)); }
 function renderWindow(force) {
   const rows = $('#rows'), tw = $('#tw'); const list = UI.list; if (!rows || !tw || !list || !list.length) return;
   const v = UI.vr, rh = v.rh, n = list.length;
@@ -735,6 +740,101 @@ function datalist(key) {
   const s = new Set(); for (const r of DB.records) if (isLive(r) && r[key]) { s.add(r[key]); if (s.size > 300) break; }
   return `<datalist id="dl_${key}">${[...s].sort().map(v => `<option value="${esc(v)}">`).join('')}</datalist>`;
 }
+
+// ---------- "storage place" (loc): custom dropdown instead of the native <datalist> ----------
+// The Electron datalist popup shows ~20 entries and does not scroll (values like DVD-77 were unreachable).
+// Empty field: the 3 most recently used places, newest first. Typing: ALL matching places (same
+// normalisation as the main search), virtualised so thousands of values scroll without lag. Free text stays allowed.
+const LOC_RECENT = 3;
+let _locIdx = null;
+function locIndex() {
+  if (_locIdx && _locIdx.rev === DB.rev) return _locIdx;
+  const last = new Map(); // place -> latest time a live record with it was created / edited
+  for (const r of DB.records) {
+    if (!isLive(r)) continue;
+    const v = String(r.loc ?? '').trim(); if (!v) continue;
+    const at = Math.max(r.ts || 0, r.created || 0);
+    if (!(last.get(v) >= at)) last.set(v, at);
+  }
+  const items = [...last].map(([v, at]) => ({ v, at, n: norm(v) }));
+  const recent = items.slice().sort((a, b) => b.at - a.at).slice(0, LOC_RECENT).map(x => x.v);
+  const coll = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' }); // DVD-9 before DVD-10
+  items.sort((a, b) => coll.compare(a.v, b.v));
+  _locIdx = { rev: DB.rev, items, recent };
+  return _locIdx;
+}
+function locMatches(q) {
+  const I = locIndex(), toks = norm(q).split(' ').filter(Boolean);
+  if (!toks.length) return I.recent;
+  const pre = [], rest = []; // values starting with the typed text first, then the other matches
+  for (const x of I.items) if (toks.every(k => x.n.includes(k))) (x.n.startsWith(toks[0]) ? pre : rest).push(x.v);
+  return pre.concat(rest);
+}
+function bindLocCombo(root) {
+  const inp = $('#f_loc', root); if (!inp) return;
+  const wrap = inp.parentElement; wrap.classList.add('combo');
+  const box = document.createElement('div'); box.className = 'combo-list hidden'; box.id = 'f_loc_list'; box.setAttribute('role', 'listbox');
+  const sizer = document.createElement('div'); sizer.className = 'combo-sizer'; box.appendChild(sizer); wrap.appendChild(box);
+  inp.setAttribute('role', 'combobox'); inp.setAttribute('aria-autocomplete', 'list'); inp.setAttribute('aria-controls', box.id); inp.setAttribute('aria-expanded', 'false');
+  let list = [], hi = -1, open = false, R = 44, muted = false, raf = 0;
+  const rowH = () => Math.round(parseFloat(getComputedStyle(document.documentElement).fontSize) * 2.75); // 44px phone, ~38px PC
+  // only the rows in view exist in the DOM
+  const render = () => {
+    raf = 0; if (!open) return;
+    const from = Math.max(0, Math.floor(box.scrollTop / R) - 4), to = Math.min(list.length, from + Math.ceil((box.clientHeight || 300) / R) + 8);
+    let h = ''; for (let i = from; i < to; i++) h += `<div class="combo-it${i === hi ? ' on' : ''}" role="option" data-i="${i}" style="top:${i * R}px;height:${R}px">${esc(list[i])}</div>`;
+    sizer.innerHTML = h;
+  };
+  // below the field, or above it when there is no room below (landscape phone, keyboard open, bottom of the card)
+  const place = () => {
+    const sc = inp.closest('.cardbody') || document.documentElement, ir = inp.getBoundingClientRect(), sr = sc.getBoundingClientRect();
+    const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+    const below = Math.min(sr.bottom, vh) - ir.bottom - 8, above = ir.top - Math.max(sr.top, 0) - (ir.top - wrap.getBoundingClientRect().top) - 8;
+    const want = Math.min(list.length, 6.5) * R; // half a row peeks out: the list visibly scrolls
+    const up = below < Math.min(want, R * 3.5) && above > below;
+    box.classList.toggle('up', up);
+    box.style.maxHeight = Math.max(R * 2, Math.min(want, up ? above : below)) + 'px';
+  };
+  const card = inp.closest('.cardbody');
+  const hide = () => { if (!open) return; open = false; hi = -1; box.classList.add('hidden'); inp.setAttribute('aria-expanded', 'false'); if (card) card.classList.remove('combo-room'); };
+  // not enough room under the field (landscape phone, open keyboard): scroll the card so the field sits at its top
+  const makeRoom = () => {
+    if (!card) return;
+    const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight, sr = card.getBoundingClientRect();
+    const below = Math.min(sr.bottom, vh) - inp.getBoundingClientRect().bottom - 8;
+    if (below >= Math.min(list.length, 4.5) * R) return;
+    card.classList.add('combo-room'); // temporary bottom padding so the card can scroll that far
+    card.scrollTop += wrap.getBoundingClientRect().top - sr.top - 4;
+  };
+  const show = () => {
+    list = locMatches(inp.value); hi = -1;
+    if (!list.length) return hide();
+    open = true; R = rowH(); box.classList.remove('hidden'); inp.setAttribute('aria-expanded', 'true');
+    sizer.style.height = list.length * R + 'px'; box.scrollTop = 0; makeRoom(); place(); render();
+  };
+  const pick = v => { inp.value = v; hide(); muted = true; inp.dispatchEvent(new Event('input', { bubbles: true })); muted = false; }; // input event: dirty check + duplicate check
+  const seeHi = () => { const top = hi * R; if (top < box.scrollTop) box.scrollTop = top; else if (top + R > box.scrollTop + box.clientHeight) box.scrollTop = top + R - box.clientHeight; render(); };
+  inp.addEventListener('focus', show);
+  inp.addEventListener('input', () => { if (!muted) show(); });
+  inp.addEventListener('keydown', e => {
+    if (e.key === 'ArrowDown') { e.preventDefault(); if (!open) return show(); hi = Math.min(list.length - 1, hi + 1); seeHi(); }
+    else if (e.key === 'ArrowUp') { if (!open) return; e.preventDefault(); hi = Math.max(0, hi - 1); seeHi(); }
+    else if (e.key === 'Enter') { if (open && hi >= 0) { e.preventDefault(); pick(list[hi]); } }
+    else if (e.key === 'Escape') { if (open) { e.preventDefault(); e.stopPropagation(); hide(); } } // close the list, not the card
+    else if (e.key === 'Tab') hide();
+  });
+  box.addEventListener('scroll', () => { if (!raf) raf = requestAnimationFrame(render); }, { passive: true });
+  box.addEventListener('mousedown', e => e.preventDefault()); // mouse: keep the focus (and caret) in the field
+  box.addEventListener('click', e => { const it = e.target.closest('[data-i]'); if (it) pick(list[+it.dataset.i]); }); // no click after a touch scroll
+  // outside tap / click, or focus moving to another field, closes it; listeners go away with the card
+  const alive = () => document.body.contains(inp);
+  const outside = e => { if (!alive()) return off(); if (open && !wrap.contains(e.target)) hide(); };
+  const focusIn = e => { if (!alive()) return off(); if (open && e.target !== inp && !box.contains(e.target)) hide(); };
+  const relayout = () => { if (!alive()) return off(); if (open) { place(); render(); } };
+  const off = () => { document.removeEventListener('pointerdown', outside, true); document.removeEventListener('focusin', focusIn); window.removeEventListener('resize', relayout); if (window.visualViewport) window.visualViewport.removeEventListener('resize', relayout); };
+  document.addEventListener('pointerdown', outside, true); document.addEventListener('focusin', focusIn);
+  window.addEventListener('resize', relayout); if (window.visualViewport) window.visualViewport.addEventListener('resize', relayout);
+}
 async function openCard(uuid, draftVals, silentRerender, presetType) {
   if (UI.card && !silentRerender) {
     if (UI.card.uuid === uuid && !!uuid) return;
@@ -750,7 +850,7 @@ async function openCard(uuid, draftVals, silentRerender, presetType) {
   const body = cols.map(c => {
     if (c.kind === 'id') return '';
     const half = ['type', 'pages', 'lang', 'date'].includes(c.key) || (!c.b && ['number', 'date', 'list'].includes(c.kind));
-    const dl = ['lang', 'loc', 'author'].includes(c.key) ? c.key : null;
+    const dl = ['lang', 'author'].includes(c.key) ? c.key : null; // loc: custom dropdown (bindLocCombo), not a datalist
     const lbl = c.kind === 'check' ? '' : `<div class="lbl">${esc(colName(c, true))}</div>`;
     let inner = lbl + fieldInputHtml(c, vals[c.key], 'f_' + c.key, { list: dl ? 'dl_' + dl : null }) + (dl ? datalist(dl) : '') + (c.key === 'inv' ? '<div class="ferr hidden" id="invErr"></div>' : '');
     if (c.key === 'inv') {
@@ -758,11 +858,11 @@ async function openCard(uuid, draftVals, silentRerender, presetType) {
     }
     return `<div class="fld ${half ? 'half' : ''}">${inner}</div>`;
   }).join('');
-  host.innerHTML = `<div class="cardhead"><button class="ib backb" id="cBack">${IC.back}</button><h3 id="cTitle">${cardTitleOf(isNew, vals.type)}</h3>${!isNew ? `<button class="ib" id="cDel" aria-label="${esc(t('btn_delete'))}">${IC.trash}</button>` : ''}<button class="ib only-wide" id="cX">${IC.close}</button></div>
+  host.innerHTML = `<div class="cardhead"><button class="ib backb" id="cBack">${IC.back}</button><h3 id="cTitle">${cardTitleOf(isNew, vals.type)}</h3>${!isNew ? `<button class="ib" id="cDel" aria-label="${esc(t('btn_delete'))}">${IC.trash}</button>` : ''}<button class="ib only-wide" id="cX" aria-label="${esc(t('close'))}">${IC.close}</button></div>
     <div class="cardbody" id="cBody">${body}<div class="warn hidden" id="dupWarn">${IC.warn}<span></span></div></div>
     <div class="actions"><!-- no Cancel: the back arrow (and X on PC) already leaves the card -->${isNew ? `<button class="btn b2" id="cNext">${t('card_save_next')}</button>` : ''}<button class="btn b1" id="cSave">${t('btn_save')}</button></div>`;
   host.classList.add('on'); $('#shell').classList.add('hascard');
-  bindCheckButtons(host);
+  bindCheckButtons(host); bindLocCombo(host);
   UI.card.init = JSON.stringify(readCard());
   if (draftVals) applyCardVals(draftVals);
   { const tt = $('#f_type', host); if (tt) tt.addEventListener('change', () => { $('#cTitle').textContent = cardTitleOf(UI.card.isNew, tt.value); }); }

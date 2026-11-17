@@ -300,7 +300,7 @@ function repRowDlg(f, m0, row) {
       const sameInv = row && !repManual(row.kind) && invKey(row.inv) === invKey(v.inv);
       const where = sameInv ? null : repWhere(v.inv, m);
       if (where) {
-        const ok = await ask({ title: t('rep_dup_title', { inv: v.inv }), text: t('rep_dup_text', { t: v.title || v.inv, m: where }), dismiss: false, buttons: [{ label: t('rep_add_anyway'), v: true, cls: 'b1' }, { label: t('rep_skip'), v: false, cls: 'b2' }] });
+        const ok = await ask({ title: t('rep_dup_title', { inv: v.inv }), text: t('rep_dup_text', { t: v.title || v.inv, m: where }), dismiss: false, buttons: [{ label: t('rep_skip'), v: false, cls: 'b2' }, { label: t('rep_add_anyway'), v: true, cls: 'b1' }] });
         if (!ok) return null;
       }
       const rec = findByInv(v.inv); if (rec) v.title = rec.title || v.title;
@@ -400,7 +400,7 @@ async function repPickAdd(f, m0, R) {
     if (repHere(m, rec.inv)) { skipped++; continue; }
     const where = repWhere(rec.inv, m);
     if (where) {
-      const ok = await ask({ title: t('rep_dup_title', { inv: rec.inv }), text: t('rep_dup_text', { t: rec.title || rec.inv, m: where }), dismiss: false, buttons: [{ label: t('rep_add_anyway'), v: true, cls: 'b1' }, { label: t('rep_skip'), v: false, cls: 'b2' }] });
+      const ok = await ask({ title: t('rep_dup_title', { inv: rec.inv }), text: t('rep_dup_text', { t: rec.title || rec.inv, m: where }), dismiss: false, buttons: [{ label: t('rep_skip'), v: false, cls: 'b2' }, { label: t('rep_add_anyway'), v: true, cls: 'b1' }] });
       if (!ok) { skipped++; continue; }
     }
     const lm = repLiveMonth(f, m0); if (!lm) { toast(t('rep_gone'), 4000); break; } // the prompt above may have waited through a sync

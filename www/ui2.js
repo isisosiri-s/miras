@@ -159,7 +159,7 @@ async function viewSettings(main) {
   <div class="group"><div class="setrow col"><div class="tt">${t('set_theme')}</div>${segHtml('sTheme', [['light', t('theme_light')], ['dark', t('theme_dark')]], H.theme)}</div>
   <div class="setrow col"><div class="tt">${t('set_font')}</div>${segHtml('sFont', [['s', t('font_s')], ['m', t('font_m')], ['l', t('font_l')]], H.font)}</div></div>
   <div class="group">${rowLink('sCols', t('set_columns'))}${rowLink('sTrash', t('set_trash'), trashN ? `${trashN}` : '')}
-  <div class="setrow"><div class="tt">${t('set_backup')}<div class="ss">${bk}</div>${Native.isApp ? `<div class="ss">${t('backup_warn')}</div>` : ''}</div><button class="sbtn" id="sBk">${t('set_backup_btn')}</button></div>
+  <div class="setrow"><div class="tt">${t('set_backup')}<div class="ss">${bk}</div>${Native.cap ? `<div class="ss">${t('backup_warn')}</div>` : ''}</div><button class="sbtn" id="sBk">${t('set_backup_btn')}</button></div>
   <div class="setrow"><div class="tt">${t('set_version')}</div><span class="ss">${APP_VERSION}</span></div></div>`);
   main.querySelector('.page').scrollTop = sc;
   const again = () => viewSettings(main);
