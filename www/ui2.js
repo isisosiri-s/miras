@@ -245,7 +245,12 @@ function viewImport(main) {
   const colRows = p.cols.map((c, i) => {
     let st, sel = '', cls = '';
     if (c.reason === 'id') st = t('imp_ignored');
-    else if (c.target === 'ignore') st = t('imp_col_ignore');
+    else if (c.target === 'ignore') {
+      st = t('imp_col_ignore');
+      // a matched column the user ignored can be switched back (target0 = the column it was matched to)
+      const d0 = c.target0 && colDef(c.target0);
+      if (d0) sel = `<select data-i="${i}"><option value="keep">${esc(t('imp_matched', { x: colName(d0) }))}</option><option value="ignore" selected>${esc(t('imp_col_ignore'))}</option></select>`;
+    }
     else if (c.target === 'new') {
       st = c.undetected && !c.chosen ? t('imp_undetected') : t('imp_new'); if (c.undetected && !c.chosen) cls = 'und';
       sel = `<select data-i="${i}">${c.undetected && !c.chosen ? `<option value="">${t('imp_choose')}</option>` : ''}${KINDS.map(k => `<option value="${k}" ${c.kind === k && (!c.undetected || c.chosen) ? 'selected' : ''}>${t(KIND_LABEL[k])}</option>`).join('')}<option value="ignore" ${c.kind === 'ignore' ? 'selected' : ''}>${t('imp_col_ignore')}</option></select>`;
@@ -257,7 +262,8 @@ function viewImport(main) {
   }).join('');
   const dupRows = I.dups.slice(0, 100).map((d, k) => {
     const v = I.rv[d.row].vals; const kindT = d.kind === 'exact' ? t('imp_dup_kind_exact') : d.kind === 'name' ? t('imp_dup_kind_name') : t('imp_dup_kind_file');
-    const acts = (d.kind === 'file' ? ['skip', 'add'] : ['skip', 'update', 'add']).map(a => `<button data-k="${k}" data-a="${a}" class="${d.act === a ? 'on' : ''}">${t('imp_' + a)}</button>`).join('');
+    // same inventory number: only skip / update (in the archive) — "add" would duplicate the number
+    const acts = (d.kind === 'file' ? (d.byInv ? ['skip'] : ['skip', 'add']) : (d.byInv ? ['skip', 'update'] : ['skip', 'update', 'add'])).map(a => `<button data-k="${k}" data-a="${a}" class="${d.act === a ? 'on' : ''}">${t('imp_' + a)}</button>`).join('');
     return `<div class="dup"><div class="h"><span>${esc(v.inv)} · ${esc(v.title || '')}</span><span style="color:var(--bad)">${d.id ? 'ID ' + d.id : ''}</span></div><div class="s">${kindT}</div><div class="acts">${acts}</div></div>`;
   }).join('');
   const canAdd = I.rv.filter(x => x.vals.inv).length - I.dups.filter(d => d.act !== 'add').length;
@@ -278,11 +284,13 @@ function viewImport(main) {
   $$('.fcol select', main).forEach(s => s.onchange = () => {
     const c = p.cols[+s.dataset.i]; const v = s.value;
     if (c.target === 'new') { if (v) { c.kind = v; c.chosen = true; } }
-    else if (v === 'ignore') { c.target0 = c.target; c.target = 'ignore'; }
+    else if (v === 'ignore') { if (c.target !== 'ignore') { c.target0 = c.target; c.target = 'ignore'; } }
+    else if (v === 'keep' && c.target === 'ignore' && c.target0) { c.target = c.target0; c.target0 = null; }
     withBusy(t('imp_progress'), async () => recomputeImport()).then(() => viewImport(main));
   });
   $$('.acts button[data-a]', main).forEach(b => b.onclick = () => { I.dups[+b.dataset.k].act = b.dataset.a; viewImport(main); });
-  $$('.acts button[data-all]', main).forEach(b => b.onclick = () => { I.dups.forEach(d => { if (b.dataset.all !== 'update' || d.kind !== 'file') d.act = b.dataset.all; }); viewImport(main); });
+  const actOk = (d, a) => !(a === 'update' && d.kind === 'file') && !(a === 'add' && d.byInv);
+  $$('.acts button[data-all]', main).forEach(b => b.onclick = () => { I.dups.forEach(d => { if (actOk(d, b.dataset.all)) d.act = b.dataset.all; }); viewImport(main); });
   const dx = $('#dupX'); if (dx) dx.onclick = () => exportDupsXlsx(p, I.rv, I.dups);
   $('#load').onclick = async () => {
     const st = await withBusy(t('imp_progress'), async () => { const x = applyImport(p, I.rv, I.dups); await flushSave(); return x; }); UI.imp = null; UI.listKey = '';

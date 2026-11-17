@@ -8,20 +8,25 @@ async function saveFile(name, blob) {
   }
   const cap = window.Capacitor;
   if (cap && cap.isNativePlatform && cap.isNativePlatform() && cap.Plugins.Filesystem && cap.Plugins.Share) {
-    const buf = new Uint8Array(await blob.arrayBuffer());
-    const res = await cap.Plugins.Filesystem.writeFile({ path: name, data: toB64(buf), directory: 'CACHE' });
+    // phone: true = saved / handed to another app, false = cancelled or failed (callers must not report a backup then)
+    let res;
+    try { const buf = new Uint8Array(await blob.arrayBuffer()); res = await cap.Plugins.Filesystem.writeFile({ path: name, data: toB64(buf), directory: 'CACHE' }); }
+    catch (e) { console.warn('save', e); toast(t('save_fail'), 5000); return false; }
+    // Share rejects when the user closes the share sheet
+    const share = async () => { try { await cap.Plugins.Share.share({ title: name, url: res.uri, dialogTitle: name }); return true; } catch (e) { console.warn('share', e); return false; } };
     const how = await ask({ title: name, buttons: [{ label: t('save_dev'), v: 'save', cls: 'b1' }, { label: t('save_share'), v: 'share', cls: 'b2' }, { label: t('btn_cancel'), v: null, cls: 'bd' }] });
-    if (how === 'share') await cap.Plugins.Share.share({ title: name, url: res.uri, dialogTitle: name });
-    else if (how === 'save') {
+    if (how === 'share') return share();
+    if (how === 'save') {
       let P = cap.Plugins.MirasFiles; try { P = P || cap.registerPlugin('MirasFiles'); } catch (e) { }
-      try { const r = await P.save({ name, mime: blob.type || 'application/octet-stream', src: res.uri }); if (r && r.saved) toast(t('file_saved')); }
-      catch (e) { console.warn('save', e); await cap.Plugins.Share.share({ title: name, url: res.uri, dialogTitle: name }); }
+      try { const r = await P.save({ name, mime: blob.type || 'application/octet-stream', src: res.uri }); if (r && r.saved) { toast(t('file_saved')); return true; } return false; }
+      catch (e) { console.warn('save', e); return share(); }
     }
-    return;
+    return false;
   }
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click();
   setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+  return true;
 }
 function pickFile(accept) {
   return new Promise(res => {
@@ -105,7 +110,8 @@ const deviceLabel = k => k === 'phone' ? t('dev_phone') : k === 'pc' ? t('dev_pc
 
 // ---------- Excel import ----------
 const BOOL_TRUE = new Set(['да', 'yes', 'true', 'hawa', '+', '✓', '✔', 'истина', '1', 'y', 'x', 'есть', 'bar', 'ha']);
-const BOOL_FALSE = new Set(['нет', 'no', 'false', 'yok', '-', '✗', '✘', 'ложь', '0', 'n', 'отсутствует', 'ok', '']);
+// note: Turkmen "ýok" normalises to "yok"; plain "ok" is NOT a no-word (it would turn an "ok" column into all-false checkboxes)
+const BOOL_FALSE = new Set(['нет', 'no', 'false', 'yok', '-', '✗', '✘', 'ложь', '0', 'n', 'отсутствует', '']);
 function isBoolWord(s) { const n = norm(s); return (BOOL_TRUE.has(n) || BOOL_FALSE.has(n)) && !/^[01]$/.test(n) && n !== ''; }
 function toBool(v) {
   if (typeof v === 'boolean') return v;
@@ -119,10 +125,17 @@ function cellStr(v) {
   return String(v).trim();
 }
 function dateISO(d) { const x = new Date(d.getTime() - d.getTimezoneOffset() * 60000 + 43200000); return x.toISOString().slice(0, 10); }
+// only real calendar dates become ISO (31.02.2020 or 12/25/2020 stay text: a date field would show them empty and wipe them)
+function isoIfValid(y, mo, d) {
+  const Y = +y, M = +mo, D = +d;
+  if (M < 1 || M > 12 || D < 1 || D > new Date(Date.UTC(Y, M, 0)).getUTCDate()) return null;
+  return `${y}-${String(M).padStart(2, '0')}-${String(D).padStart(2, '0')}`;
+}
+const isIsoDate = v => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) && isoIfValid(v.slice(0, 4), v.slice(5, 7), v.slice(8, 10)) === v;
 function parseDateStr(s) {
   s = String(s).trim();
-  let m = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(s); if (m) return `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
-  m = /^(\d{1,2})[./](\d{1,2})[./](\d{4})$/.exec(s); if (m) return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+  let m = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(s); if (m) return isoIfValid(m[1], m[2], m[3]);
+  m = /^(\d{1,2})[./](\d{1,2})[./](\d{4})$/.exec(s); if (m) return isoIfValid(m[3], m[2], m[1]);
   return null;
 }
 function cellDate(v) { if (v instanceof Date) return dateISO(v); return parseDateStr(cellStr(v)); }
@@ -147,9 +160,11 @@ const ALIASES = [
   ['title', /(назван|наименован|заглав|^ady|\bady\b|title|^name$|book name|kitap ad|имя книги)/],
   ['author', /(автор|awtor|author|yazar|muallif|составител)/],
   ['lang', /(язык|^dili?$|language|^lang)/],
-  ['date', /(дата|век|год|^sene|asyr|centur|^date|year|tarih|yuzyil)/],
+  // "век"/"год" only as whole words (not "человек", "пригодность"); the date of the WORK, not of acquisition / registration
+  ['date', /(дата|(^|[^а-яё])век|(^|[^а-яё])год|^sene|asyr|centur|^date|year|tarih|yuzyil)/, /(поступ|приобрет|получ|регистр|учет|учёт|внесен|рожд|смерт|acqui|receiv|regist|added|birth|death|kabul|alnan|hasaba|girizil)/],
   ['type', /^(вид|тип|gornus|type|kind)/],
-  ['pages', /(стран|лист|sahyp|warak|page|leaf|leaves|^pp?$)/],
+  // "страниц" (pages), not "стран" which is also "страна" (country)
+  ['pages', /(страниц|^стр$|лист|sahyp|warak|page|leaf|leaves|^pp?$)/],
   ['loc', /(хранен|мест|\byer|saklan|locat|storage|shelf|полка|шкаф)/],
 ];
 function matchHeader(h) {
@@ -165,7 +180,7 @@ function matchHeader(h) {
     if (names.has(n)) return c.key;
   }
   if (/(скан|skan|scan|оцифр|digiti)/.test(n)) { return /(дат|date|sene)/.test(n) ? null : 'scanned'; }
-  for (const [key, re] of ALIASES) { if (re && re.test(n)) return key; }
+  for (const [key, re, not] of ALIASES) { if (re && re.test(n) && !(not && not.test(n))) return key; }
   return null;
 }
 const LANGS_ALL = ['ru', 'tk', 'en'];
@@ -227,10 +242,11 @@ function detectImportDups(plan, rv) {
     const v = x.vals; if (!v.inv) { noInv++; return; }
     const ik = invKey(v.inv); const nk = v.title && norm(v.title).length >= 2 ? norm(v.title) + '|' + norm(v.author || '') : null;
     let d = null;
-    if (seenInv.has(ik)) d = { row: i, kind: 'file', other: seenInv.get(ik) };
+    // byInv: the inventory number itself is taken, so "add" is not allowed (it would create a second record with the same number)
+    if (seenInv.has(ik)) d = { row: i, kind: 'file', other: seenInv.get(ik), byInv: true };
     else if (nk && seenName.has(nk)) d = { row: i, kind: 'file', other: seenName.get(nk) };
     else {
-      const ex = findByInv(v.inv); if (ex) d = { row: i, kind: 'exact', uuid: ex.uuid, id: ex.id };
+      const ex = findByInv(v.inv); if (ex) d = { row: i, kind: 'exact', uuid: ex.uuid, id: ex.id, byInv: true };
       else if (nk) { const en = findByName(v.title, v.author); if (en) d = { row: i, kind: 'name', uuid: en.uuid, id: en.id }; }
     }
     if (d) { d.act = 'skip'; dups.push(d); } else { seenInv.set(ik, i); if (nk) seenName.set(nk, i); }
@@ -266,6 +282,8 @@ function applyImport(plan, rv, dups) {
       if (Object.keys(upd).length) updateRecord(ex, upd);
       stats.updated++; continue;
     }
+    // last guard: never create a second record with an inventory number that already exists (in the archive or added just now)
+    if (findByInv(v.inv)) { stats.skipped++; continue; }
     const r = newRecord(fullVals(i), base + i, nid++); created.set(i, r); stats.added++;
   }
   scheduleSave();
@@ -511,15 +529,19 @@ function setAllConflicts(plan, mode) {
 async function applyMerge(plan) {
   const localIdsBefore = new Map(DB.records.map(r => [r.uuid, r.id]));
   const clone = o => JSON.parse(JSON.stringify(o));
+  // update records IN PLACE: an open card / cell editor keeps a reference to the record object,
+  // replacing it would make a later save write into a detached copy (silently lost)
+  const assignInPlace = (cur, src) => { for (const k of Object.keys(cur)) delete cur[k]; Object.assign(cur, src); };
+  const idx = new Map(DB.records.map((r, i) => [r.uuid, i]));
   for (const op of plan.ops) {
-    if (op.type === 'add') { const r = clone(op.rec); DB.records.push(r); }
-    else { const i = DB.records.findIndex(r => r.uuid === op.uuid); if (i >= 0) DB.records[i] = clone(op.rec); }
+    if (op.type === 'add') { const r = clone(op.rec); idx.set(r.uuid, DB.records.length); DB.records.push(r); }
+    else { const i = idx.get(op.uuid); if (i !== undefined) assignInPlace(DB.records[i], clone(op.rec)); }
   }
   for (const c of plan.conflicts) {
-    const i = DB.records.findIndex(r => r.uuid === c.uuid); if (i < 0) continue;
+    const i = idx.get(c.uuid); if (i === undefined) continue;
     const base = clone(c.choice === 'remote' ? c.remote : c.local);
     base.vv = vvJoin(c.local.vv, c.remote.vv); base.vv[H.deviceId] = (base.vv[H.deviceId] || 0) + 1; base.ts = Date.now();
-    DB.records[i] = base;
+    assignInPlace(DB.records[i], base);
   }
   // columns
   const rcols = plan.payload.columns || [];

@@ -659,7 +659,8 @@ function fieldInputHtml(c, val, id, opt = {}) {
   }
   if (c.kind === 'type') return `<select class="inp" id="${id}"><option value="">${esc(t('opt_none'))}</option>${['manuscript', 'printed'].map(k => `<option value="${k}" ${v === k ? 'selected' : ''}>${esc(t('type_' + k))}</option>`).join('')}</select>`;
   if (c.kind === 'list') return `<select class="inp" id="${id}"><option value="">${esc(t('opt_none'))}</option>${(c.opts || []).concat(v && !(c.opts || []).includes(v) ? [v] : []).map(o => `<option ${v === o ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select>`;
-  if (c.kind === 'date') return `<input class="inp" id="${id}" type="date" value="${esc(v)}">`;
+  // a value that is not a valid ISO date (old import, typed elsewhere) is shown as text: a date input would show it empty and saving would erase it
+  if (c.kind === 'date') return v === '' || isIsoDate(v) ? `<input class="inp" id="${id}" type="date" value="${esc(v)}">` : `<input class="inp" id="${id}" autocomplete="off" value="${esc(v)}">`;
   if (c.kind === 'number') return `<input class="inp" id="${id}" inputmode="decimal" autocomplete="off" value="${esc(typeof v === 'number' ? String(v).replace('.', LANG === 'en' ? '.' : ',') : v)}">`;
   return `<input class="inp" id="${id}" autocomplete="off" value="${esc(v)}" ${opt.list ? `list="${opt.list}"` : ''}>`;
 }
@@ -823,7 +824,15 @@ function saveCardCore() {
   const ex = findByInv(inv, UI.card.uuid);
   if (ex) { ie.classList.remove('hidden'); ie.textContent = t('err_inv_dup', { id: ex.id }); iEl.classList.add('err'); iEl.focus(); return false; }
   vals.inv = inv; if (UI.card.isNew && UI.card.preset && vals.type === undefined) vals.type = UI.card.preset;
-  if (UI.card.isNew) { UI.card.rec = newRecord(vals); UI.card.isNew = false; UI.card.uuid = UI.card.rec.uuid; } else updateRecord(UI.card.rec, vals);
+  if (UI.card.isNew) { UI.card.rec = newRecord(vals); UI.card.isNew = false; UI.card.uuid = UI.card.rec.uuid; }
+  else {
+    // write only the fields the user changed in this card: a sync that arrived while the card was open
+    // may have updated other fields, and the stale values still shown in the card must not overwrite them
+    const init = JSON.parse(UI.card.init || '{}'), upd = {};
+    for (const k of Object.keys(vals)) if (JSON.stringify(vals[k]) !== JSON.stringify(init[k])) upd[k] = vals[k];
+    const rec = byUuid().get(UI.card.uuid) || UI.card.rec; UI.card.rec = rec;
+    if (Object.keys(upd).length) updateRecord(rec, upd);
+  }
   UI.card.init = JSON.stringify(readCard());
   toast(t('toast_saved'), 1200);
   return true;

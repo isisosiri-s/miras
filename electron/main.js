@@ -54,11 +54,22 @@ function dailyBackup() {
     for (const n of listBackups().slice(BACKUPS_KEEP)) { try { fs.unlinkSync(path.join(dir, n)); } catch { /* ignore */ } }
   } catch (e) { console.error(e); }
 }
+// rename over the old file; antivirus / indexer may hold it for a moment on Windows (EPERM/EBUSY/EACCES): retry briefly
+async function renameRetry(a, b) {
+  for (let i = 0; ; i++) {
+    try { return await fs.promises.rename(a, b); } catch (e) {
+      if (i >= 6 || !['EPERM', 'EBUSY', 'EACCES'].includes(e && e.code)) throw e;
+      await new Promise(r => setTimeout(r, 80 * (i + 1)));
+    }
+  }
+}
 function persist() {
-  dailyBackup(); // copies the last good file once a day, before it is overwritten
+  try { dailyBackup(); } catch (e) { log('daily backup failed', e); } // copies the last good file once a day, before it is overwritten
   const data = JSON.stringify(store), f = dbFile(), tmp = f + '.tmp';
-  writing = writing.then(() => fs.promises.writeFile(tmp, data).then(() => fs.promises.rename(tmp, f))).catch(e => console.error(e));
-  return writing;
+  const job = writing.then(() => fs.promises.writeFile(tmp, data)).then(() => renameRetry(tmp, f));
+  writing = job.catch(() => { }); // keep the queue alive for the next write
+  // the failure goes back to the window (kv:set rejects) so the user is told the data was NOT saved
+  return job.catch(e => { log('db write failed', e); throw e; });
 }
 ipcMain.handle('kv:get', (_e, k) => load()[k] ?? null);
 ipcMain.handle('kv:set', (_e, k, v) => { load()[k] = v; return persist(); });

@@ -43,7 +43,10 @@ function parseNum(s) {
   if (typeof s === 'number') return s;
   s = String(s ?? '').trim().replace(/[\s ]/g, '');
   if (!s) return null;
-  if (/^-?\d{1,3}(,\d{3})+(\.\d+)?$/.test(s)) s = s.replace(/,/g, '');
+  // comma = thousands separator only when that is unambiguous: "1,234,567", "1,234.5", or "1,500" in English.
+  // In Russian / Turkmen the comma is the decimal mark, so "1,500" there is 1.5 (thousands are written with spaces).
+  const grouped = /^-?\d{1,3}(,\d{3})+(\.\d+)?$/.test(s);
+  if (grouped && (LANG === 'en' || /,\d{3},|\./.test(s))) s = s.replace(/,/g, '');
   else s = s.replace(',', '.');
   if (!/^-?\d+(\.\d+)?$/.test(s)) return null;
   return Number(s);
@@ -204,7 +207,13 @@ async function loadHeader() {
 }
 
 // ---------- persistence of data ----------
-let _saveTimer = null, _saving = Promise.resolve();
+let _saveTimer = null, _saving = Promise.resolve(), _saveErrAt = 0;
+// a failed write (disk full, file locked, storage quota) must be visible: the data is only in memory until the next good save
+function onSaveError(e) {
+  console.error('save', e);
+  if (Date.now() - _saveErrAt < 10000) return; _saveErrAt = Date.now();
+  try { if (typeof toast === 'function') toast(t('db_save_fail'), 6000); } catch (_) { /* ignore */ }
+}
 function persistObj() {
   return { v: 1, records: DB.records, columns: DB.columns, colsTs: DB.colsTs, draft: DB.draft, reports: DB.reports, repTomb: DB.repTomb, repOrd: DB.repOrd };
 }
@@ -217,11 +226,11 @@ async function writeData() {
 function scheduleSave() {
   DB.rev++;
   clearTimeout(_saveTimer);
-  _saveTimer = setTimeout(() => { _saving = _saving.then(writeData).catch(e => console.error('save', e)); }, 350);
+  _saveTimer = setTimeout(() => { _saving = _saving.then(writeData).catch(onSaveError); }, 350);
 }
 async function flushSave() {
   clearTimeout(_saveTimer);
-  _saving = _saving.then(writeData).catch(e => console.error('save', e));
+  _saving = _saving.then(writeData).catch(onSaveError);
   await _saving;
 }
 function loadDataObj(o) {

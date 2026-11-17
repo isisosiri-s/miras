@@ -9,6 +9,14 @@ const repKindLabel = k => (repManual(k) ? t('rep_k_' + k) : t('type_' + k));
 const repMonthName = n => t('rep_m' + n);
 const repFolder = id => DB.reports.find(f => f.id === id);
 const repMonthOf = (f, id) => (f ? f.months.find(m => m.id === id) : null);
+// a sync replaces the report objects while a dialog may still hold the old ones: find the live month again
+// (by id, else by folder name + month number, the same keys the merge pairs them by)
+function repLiveMonth(f, m) {
+  const nk = s => String(s == null ? '' : s).trim().toLowerCase();
+  const lf = DB.reports.find(x => x.id === f.id) || DB.reports.find(x => nk(x.name) === nk(f.name));
+  if (!lf) return null;
+  return lf.months.find(x => x.id === m.id) || lf.months.find(x => x.m === m.m) || null;
+}
 // change stamps and delete markers: they let two devices merge reports
 const repTomb = id => { DB.repTomb[id] = Date.now(); };
 const repBadge = k => (k === 'printed' ? 'l' : k === 'book' ? 'b' : k === 'other' ? 'o' : '');
@@ -58,12 +66,12 @@ function repHitsHtml(q) {
 function repWhere(inv, exceptMonth) {
   const k = invKey(inv); if (!k) return null;
   for (const f of DB.reports) for (const m of f.months) {
-    if (m === exceptMonth) continue;
+    if (exceptMonth && (m === exceptMonth || m.id === exceptMonth.id)) continue;
     if (m.rows.some(r => !repManual(r.kind) && invKey(r.inv) === k)) return `${repMonthName(m.m)} ${f.name}`;
   }
   return null;
 }
-const repHere = (m, inv, exceptRow) => { const k = invKey(inv); return !!k && m.rows.some(r => r !== exceptRow && !repManual(r.kind) && invKey(r.inv) === k); };
+const repHere = (m, inv, exceptRow) => { const k = invKey(inv); return !!k && m.rows.some(r => !(exceptRow && r.id === exceptRow.id) && !repManual(r.kind) && invKey(r.inv) === k); };
 
 // ---------- entry point ----------
 function viewReports(main) {
@@ -176,7 +184,7 @@ function repViewMonth(main, f, m) {
     <div class="rp-tools"><button class="btn b2" id="rpSort">⇅ ${esc(t('rep_sort_type'))}</button><button class="btn b2" id="rpSel">☑ ${esc(t('rep_select'))}</button><button class="btn b1" id="rpArc">+ ${esc(t('rep_from_archive'))}</button></div>
     <div id="rpRows">${m.rows.length ? m.rows.map(repRowHtml).join('') : `<div class="empty">${esc(t('rep_list_empty'))}</div>`}</div>
     <div class="rp-bar hidden" id="rpSelBar"><button class="btn b2" id="rpSCancel">${esc(t('btn_cancel'))}</button><button class="btn b2" id="rpSAll"></button><button class="btn bad" id="rpSDel"></button></div>`;
-  repShell(main, `${f.name} · ${repMonthName(m.m)}`, inner, t('rep_add'), () => repRowDlg(m, null), true);
+  repShell(main, `${f.name} · ${repMonthName(m.m)}`, inner, t('rep_add'), () => repRowDlg(f, m, null), true);
   $('#rpArc').onclick = () => { UI.rep.pick = { sel: new Set(), q: '' }; renderRoute(); animRoute(); const p = $('.page'); if (p) p.scrollTop = 0; };
   $('#rpSort').onclick = () => { m.rows = m.rows.map((r, i) => [r, i]).sort((a, b) => REP_KINDS.indexOf(a[0].kind) - REP_KINDS.indexOf(b[0].kind) || a[1] - b[1]).map(x => x[0]); m.ordTs = Date.now(); scheduleSave(); repRerender(); };
   const box = $('#rpRows'), bar = $('#rpSelBar');
@@ -217,7 +225,7 @@ function repViewMonth(main, f, m) {
     if (swallow) { swallow = false; return; }
     const r = e.target.closest('.rp-row'); if (!r) return;
     if (R.sel) { const id = r.dataset.id; if (R.sel.has(id)) R.sel.delete(id); else R.sel.add(id); syncSel(); return; }
-    const row = m.rows.find(x => x.id === r.dataset.id); if (row) repRowDlg(m, row);
+    const row = m.rows.find(x => x.id === r.dataset.id); if (row) repRowDlg(f, m, row);
   });
   repDrag(box, '.rp-row', ids => {
     const by = new Map(m.rows.map(r => [r.id, r])), next = ids.map(i => by.get(i)).filter(Boolean);
@@ -265,7 +273,10 @@ function repDrag(box, sel, onDone, idKey) {
 }
 
 // add / edit one row
-function repRowDlg(m, row) {
+function repRowDlg(f, m0, row) {
+  // always work on the live month (a Wi-Fi sync may have replaced it while this dialog was open)
+  const live = () => repLiveMonth(f, m0);
+  const gone = () => { toast(t('rep_gone'), 4000); return null; };
   const st = { kind: row ? row.kind : 'manuscript', userKind: !!row, userLeaves: !!row && row.leaves !== '' };
   const html = `<div class="seg" id="rpKind">${REP_KINDS.map(k => `<button type="button" data-k="${k}" class="${k === st.kind ? 'on' : ''}">${esc(repKindLabel(k))}</button>`).join('')}</div>
     <div id="rpInvBox"><div class="lbl">${esc(t('rep_inv'))}</div><input class="inp" id="rpInv" autocomplete="off" value="${esc(row && !repManual(row.kind) ? row.inv || '' : '')}"><div class="rp-found" id="rpFound"></div></div>
@@ -280,11 +291,14 @@ function repRowDlg(m, row) {
   // validate, resolve duplicates; returns the clean values or null
   const prepare = async mb => {
     const v = read(mb);
+    const m = live(); if (!m) return gone();
     if (repManual(v.kind)) { if (!v.title) { toast(t('rep_title_need')); $('#rpTitle', mb).focus(); return null; } }
     else {
       if (!v.inv) { toast(t('rep_inv_need')); $('#rpInv', mb).focus(); return null; }
       if (repHere(m, v.inv, row)) { toast(t('rep_in_this')); return null; }
-      const where = repWhere(v.inv, m);
+      // editing a row without changing its inventory number: the user was already asked when it was added
+      const sameInv = row && !repManual(row.kind) && invKey(row.inv) === invKey(v.inv);
+      const where = sameInv ? null : repWhere(v.inv, m);
       if (where) {
         const ok = await ask({ title: t('rep_dup_title', { inv: v.inv }), text: t('rep_dup_text', { t: v.title || v.inv, m: where }), dismiss: false, buttons: [{ label: t('rep_add_anyway'), v: true, cls: 'b1' }, { label: t('rep_skip'), v: false, cls: 'b2' }] });
         if (!ok) return null;
@@ -312,6 +326,7 @@ function repRowDlg(m, row) {
   if (row) buttons.push({ label: t('btn_delete'), v: 'del', cls: 'bad' });
   else buttons.push({ label: t('rep_add_more'), cls: 'b3', keep: true, onClick: async mb => {
     const v = await prepare(mb); if (!v) return;
+    const m = live(); if (!m) return gone();
     m.rows.push({ id: uuid(), ts: Date.now(), ...v }); scheduleSave(); repRerender();
     $('#rpInv', mb).value = ''; $('#rpTitle', mb).value = ''; $('#rpLeaves', mb).value = ''; st.userKind = false; st.userLeaves = false; sync(mb); $('#rpInv', mb).focus();
   } });
@@ -326,9 +341,17 @@ function repRowDlg(m, row) {
       sync(mb);
     },
   }).then(async v => {
-    if (v === 'del') { if (await confirmDlg(t('rep_del_row'), t('btn_delete'), true)) { m.rows = m.rows.filter(r => r !== row); repTomb(row.id); scheduleSave(); repRerender(); } return; }
+    if (v === 'del') {
+      if (!(await confirmDlg(t('rep_del_row'), t('btn_delete'), true))) return;
+      const m = live(); if (m) m.rows = m.rows.filter(r => r.id !== row.id);
+      repTomb(row.id); scheduleSave(); repRerender(); return;
+    }
     if (!v || typeof v !== 'object') return;
-    if (row) Object.assign(row, v, { ts: Date.now() }); else m.rows.push({ id: uuid(), ts: Date.now(), ...v });
+    const m = live(); if (!m) return gone();
+    const cur = row ? m.rows.find(r => r.id === row.id) : null;
+    if (cur) Object.assign(cur, v, { ts: Date.now() });
+    else if (row) m.rows.push({ ...row, ...v, ts: Date.now() }); // removed on the other device meanwhile: the edit keeps it
+    else m.rows.push({ id: uuid(), ts: Date.now(), ...v });
     scheduleSave(); repRerender();
   });
 }
@@ -365,20 +388,23 @@ function repViewPick(main, f, m) {
     r.classList.toggle('on', R.sel.has(u)); r.querySelector('.chk').classList.toggle('on', R.sel.has(u)); upd();
   };
   $('#rpPCancel').onclick = () => history.back();
-  $('#rpPAdd').onclick = () => repPickAdd(m, R);
+  $('#rpPAdd').onclick = () => repPickAdd(f, m, R);
 }
-async function repPickAdd(m, R) {
+async function repPickAdd(f, m0, R) {
   const recs = [...R.sel].map(u => byUuid().get(u)).filter(r => r && isLive(r)).sort((a, b) => a.id - b.id);
   if (!recs.length) return;
   let added = 0, sc = 0, ns = 0, rs = 0, nrs = 0, skipped = 0;
   for (const rec of recs) {
+    const m = repLiveMonth(f, m0); // re-resolved after every prompt: a sync may have replaced the month
+    if (!m) { toast(t('rep_gone'), 4000); break; }
     if (repHere(m, rec.inv)) { skipped++; continue; }
     const where = repWhere(rec.inv, m);
     if (where) {
       const ok = await ask({ title: t('rep_dup_title', { inv: rec.inv }), text: t('rep_dup_text', { t: rec.title || rec.inv, m: where }), dismiss: false, buttons: [{ label: t('rep_add_anyway'), v: true, cls: 'b1' }, { label: t('rep_skip'), v: false, cls: 'b2' }] });
       if (!ok) { skipped++; continue; }
     }
-    m.rows.push({ id: uuid(), ts: Date.now(), kind: rec.type === 'printed' ? 'printed' : 'manuscript', inv: rec.inv, title: rec.title || '', leaves: rec.pages === '' || rec.pages == null ? '' : repLeavesOf(rec.pages), scanned: false });
+    const lm = repLiveMonth(f, m0); if (!lm) { toast(t('rep_gone'), 4000); break; } // the prompt above may have waited through a sync
+    lm.rows.push({ id: uuid(), ts: Date.now(), kind: rec.type === 'printed' ? 'printed' : 'manuscript', inv: rec.inv, title: rec.title || '', leaves: rec.pages === '' || rec.pages == null ? '' : repLeavesOf(rec.pages), scanned: false });
     added++; if (rec.scanned) sc++; else ns++; if (rec.restored) rs++; else nrs++;
   }
   scheduleSave();

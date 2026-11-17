@@ -46,7 +46,7 @@ function startCellEdit(sp, r, c) {
   if (c.kind === 'type' || c.kind === 'list') {
     const opts = c.kind === 'type' ? [['', t('opt_none')], ['manuscript', t('type_manuscript')], ['printed', t('type_printed')]] : [['', t('opt_none')], ...(c.opts || []).map(o => [o, o])];
     el = document.createElement('select'); el.innerHTML = opts.map(([v, l]) => `<option value="${esc(v)}" ${raw === v ? 'selected' : ''}>${esc(l)}</option>`).join('');
-  } else { el = document.createElement('input'); el.type = c.kind === 'date' ? 'date' : 'text'; el.value = c.kind === 'number' && typeof raw === 'number' ? String(raw).replace('.', LANG === 'en' ? '.' : ',') : raw; }
+  } else { el = document.createElement('input'); el.type = c.kind === 'date' && (raw === '' || isIsoDate(raw)) ? 'date' : 'text'; el.value = c.kind === 'number' && typeof raw === 'number' ? String(raw).replace('.', LANG === 'en' ? '.' : ',') : raw; }
   el.className = 'inp'; el.style.cssText = 'width:100%;height:100%;box-sizing:border-box;margin:0;padding:2px 6px;font-size:inherit';
   sp.innerHTML = ''; sp.appendChild(el); el.focus(); if (el.select && el.tagName === 'INPUT') el.select();
   let done = false;
