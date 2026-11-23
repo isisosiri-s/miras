@@ -1,5 +1,5 @@
 'use strict';
-/* Miras core: i18n, utils, crypto, storage, data model */
+/* Gazna core: i18n, utils, crypto, storage, data model */
 const APP_VERSION = '1.1.31';
 const PBKDF_ITER = 250000;
 const TRASH_DAYS = 30;
@@ -8,7 +8,6 @@ const TRASH_DAYS = 30;
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-const sleep = ms => new Promise(r => setTimeout(r, ms));
 function uuid() {
   const b = crypto.getRandomValues(new Uint8Array(16));
   b[6] = (b[6] & 0x0f) | 0x40; b[8] = (b[8] & 0x3f) | 0x80;
@@ -97,32 +96,19 @@ async function unwrapRaw(secret, o) {
   const k = await kdf(secret, fromB64(o.salt), o.iter);
   return aesDec(k, fromB64(o.w)); // throws on wrong secret
 }
-const REC_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
-function genRecoveryCode() {
-  const r = crypto.getRandomValues(new Uint8Array(16)); let s = '';
-  for (const x of r) s += REC_ALPHABET[x % REC_ALPHABET.length];
-  return s.match(/.{4}/g).join('-');
-}
-function normRecovery(s) {
-  return String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '').replace(/O/g, '0').replace(/I|L/g, '1')
-    .split('').map(c => c).join('');
-}
-// Recovery codes use an alphabet without 0/O/1/I/L, so normalising O->0, I/L->1 can never collide with a real char.
-// The code is canonicalised as XXXX-XXXX-XXXX-XXXX before key derivation.
-function canonRecovery(s) { const n = normRecovery(s); return n.match(/.{1,4}/g)?.join('-') || ''; }
 
 // Encrypted file (backup / sync): password-based
 async function sealFile(obj, password, encrypt) {
   const json = JSON.stringify(obj, (k, v) => (k[0] === '_' ? undefined : v));
-  if (!encrypt) return JSON.stringify({ app: 'miras', fmt: 1, enc: false, data: JSON.parse(json) });
+  if (!encrypt) return JSON.stringify({ app: 'gazna', fmt: 1, enc: false, data: JSON.parse(json) });
   const salt = crypto.getRandomValues(new Uint8Array(16));
   const key = await kdf(password, salt, PBKDF_ITER);
   const ct = await aesEnc(key, TE.encode(json));
-  return JSON.stringify({ app: 'miras', fmt: 1, enc: true, salt: toB64(salt), iter: PBKDF_ITER, ct: toB64(ct) });
+  return JSON.stringify({ app: 'gazna', fmt: 1, enc: true, salt: toB64(salt), iter: PBKDF_ITER, ct: toB64(ct) });
 }
 async function openFile(text, password) {
   let w; try { w = JSON.parse(text); } catch { throw new Error('format'); }
-  if (!w || w.app !== 'miras') throw new Error('format');
+  if (!w || (w.app !== 'gazna' && w.app !== 'miras')) throw new Error('format');
   if (!w.enc) return w.data;
   if (password == null) throw new Error('password');
   try {
@@ -137,19 +123,19 @@ const KV = {
   async _open() {
     if (this._db) return this._db;
     this._db = await new Promise((res, rej) => {
-      const rq = indexedDB.open('miras', 1);
+      const rq = indexedDB.open('gazna', 1);
       rq.onupgradeneeded = () => rq.result.createObjectStore('kv');
       rq.onsuccess = () => res(rq.result); rq.onerror = () => rej(rq.error);
     });
     return this._db;
   },
   async get(k) {
-    if (window.MirasNative && MirasNative.kvGet) return MirasNative.kvGet(k);
+    if (window.GaznaNative && GaznaNative.kvGet) return GaznaNative.kvGet(k);
     const db = await this._open();
     return new Promise((res, rej) => { const r = db.transaction('kv').objectStore('kv').get(k); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
   },
   async set(k, v) {
-    if (window.MirasNative && MirasNative.kvSet) return MirasNative.kvSet(k, v);
+    if (window.GaznaNative && GaznaNative.kvSet) return GaznaNative.kvSet(k, v);
     const db = await this._open();
     return new Promise((res, rej) => { const tx = db.transaction('kv', 'readwrite'); tx.objectStore('kv').put(v, k); tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error); });
   },
@@ -179,7 +165,7 @@ function defaultColumns() {
 // ---------- global state ----------
 const H = { // header: not encrypted
   v: 1, lang: 'ru', theme: 'light', font: 'm', autolock: 60, shot: true, bio: false, enc: false, pinLen: 0,
-  deviceId: '', pw: null, rec: null, lock: { fails: 0, until: 0 }, lastBackup: 0, setupDone: false,
+  deviceId: '', pw: null, rec: null, lock: { fails: 0, until: 0 }, lastBackup: 0, setupDone: false, sort: null, side: 'hidden', sideLast: 'full',
 };
 const DB = { // data: only in memory while unlocked
   records: [], columns: defaultColumns(), colsTs: 0, draft: null, rev: 0, reports: [], repTomb: {}, repOrd: 0,

@@ -1,5 +1,5 @@
 'use strict';
-// Miras Wi-Fi sync server (runs in the Windows app). It only relays encrypted text to the app window;
+// Gazna Wi-Fi sync server (runs in the Windows app). It only relays encrypted text to the app window;
 // the 9-digit code is the encryption key, so nothing readable travels over the network.
 const http = require('http'), os = require('os'), crypto = require('crypto');
 
@@ -26,7 +26,7 @@ function startServer(onRequest, onEvent) {
   server = http.createServer((req, res) => {
     bump();
     if (req.method === 'OPTIONS') return send(res, 204, '');
-    if (req.method === 'GET' && req.url === '/hello') return send(res, 200, JSON.stringify({ app: 'miras', lan: 1 }), 'application/json');
+    if (req.method === 'GET' && req.url === '/hello') return send(res, 200, JSON.stringify({ app: 'gazna', lan: 1 }), 'application/json');
     if (req.method === 'POST' && req.url === '/sync') {
       if (Date.now() < st.until) return send(res, 429, 'wait');
       const chunks = []; let size = 0, dead = false;

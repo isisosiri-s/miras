@@ -1,4 +1,4 @@
-// Run once after `npx cap add android`: predictive back, light status-bar icons, Miras launcher icon.
+// Run once after `npx cap add android`: predictive back, light status-bar icons, Gazna launcher icon.
 const fs = require('fs'), path = require('path');
 const res = 'android/app/src/main/res';
 // 1) manifest: predictive back gesture
@@ -32,15 +32,15 @@ for (const f of ['drawable-v24/ic_launcher_foreground.xml', 'drawable/ic_launche
 // 4) sign debug builds with the permanent key at ~/.android/debug.keystore (explicit, so Gradle cannot create a random one)
 const gp = 'android/app/build.gradle';
 let g = fs.readFileSync(gp, 'utf8');
-if (!g.includes('MIRAS_SIGNING')) {
-  g += `\n// MIRAS_SIGNING\nandroid {\n    signingConfigs {\n        debug {\n            storeFile file("${'$'}{System.getProperty('user.home')}/.android/debug.keystore")\n            storePassword 'android'\n            keyAlias 'androiddebugkey'\n            keyPassword 'android'\n        }\n    }\n}\n`;
+if (!g.includes('GAZNA_SIGNING')) {
+  g += `\n// GAZNA_SIGNING\nandroid {\n    signingConfigs {\n        debug {\n            storeFile file("${'$'}{System.getProperty('user.home')}/.android/debug.keystore")\n            storePassword 'android'\n            keyAlias 'androiddebugkey'\n            keyPassword 'android'\n        }\n    }\n}\n`;
   fs.writeFileSync(gp, g);
 }
-// 5) native plugin MirasBars: colour the areas behind the status / navigation bars (top colour, bottom colour)
+// 5) native plugin GaznaBars: colour the areas behind the status / navigation bars (top colour, bottom colour)
 {
-  const dir = 'android/app/src/main/java/app/miras/archive';
+  const dir = 'android/app/src/main/java/app/gazna/archive';
   fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(dir + '/MirasBarsPlugin.java', `package app.miras.archive;
+  fs.writeFileSync(dir + '/GaznaBarsPlugin.java', `package app.gazna.archive;
 
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
@@ -52,8 +52,8 @@ import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
-@CapacitorPlugin(name = "MirasBars")
-public class MirasBarsPlugin extends Plugin {
+@CapacitorPlugin(name = "GaznaBars")
+public class GaznaBarsPlugin extends Plugin {
     @PluginMethod
     public void set(final PluginCall call) {
         final String top = call.getString("top", "#5B3A1E");
@@ -72,7 +72,7 @@ public class MirasBarsPlugin extends Plugin {
     }
 }
 `);
-  fs.writeFileSync(dir + '/MirasFilesPlugin.java', `package app.miras.archive;
+  fs.writeFileSync(dir + '/GaznaFilesPlugin.java', `package app.gazna.archive;
 
 import android.app.Activity;
 import android.content.Intent;
@@ -88,14 +88,14 @@ import java.io.FileInputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 
-@CapacitorPlugin(name = "MirasFiles")
-public class MirasFilesPlugin extends Plugin {
+@CapacitorPlugin(name = "GaznaFiles")
+public class GaznaFilesPlugin extends Plugin {
     @PluginMethod
     public void save(PluginCall call) {
         Intent i = new Intent(Intent.ACTION_CREATE_DOCUMENT);
         i.addCategory(Intent.CATEGORY_OPENABLE);
         i.setType(call.getString("mime", "application/octet-stream"));
-        i.putExtra(Intent.EXTRA_TITLE, call.getString("name", "miras.bin"));
+        i.putExtra(Intent.EXTRA_TITLE, call.getString("name", "gazna.bin"));
         startActivityForResult(call, i, "saveDone");
     }
 
@@ -119,7 +119,7 @@ public class MirasFilesPlugin extends Plugin {
     }
 }
 `);
-  fs.writeFileSync(dir + '/MainActivity.java', `package app.miras.archive;
+  fs.writeFileSync(dir + '/MainActivity.java', `package app.gazna.archive;
 
 import android.os.Bundle;
 import com.getcapacitor.BridgeActivity;
@@ -127,8 +127,8 @@ import com.getcapacitor.BridgeActivity;
 public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
-        registerPlugin(MirasBarsPlugin.class);
-        registerPlugin(MirasFilesPlugin.class);
+        registerPlugin(GaznaBarsPlugin.class);
+        registerPlugin(GaznaFilesPlugin.class);
         super.onCreate(savedInstanceState);
     }
 }

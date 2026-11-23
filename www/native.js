@@ -2,13 +2,13 @@
 /* Thin bridge to native features. In a plain browser everything degrades gracefully. */
 const Native = {
   get cap() { return window.Capacitor && Capacitor.isNativePlatform && Capacitor.isNativePlatform() ? Capacitor : null; },
-  get isApp() { return !!(window.MirasNative || this.cap); },
+  get isApp() { return !!(window.GaznaNative || this.cap); },
   plugin(n) { return this.cap && this.cap.Plugins ? this.cap.Plugins[n] : null; },
   // screenshots / screen recording
-  canBlockShots() { return !!((window.MirasNative && MirasNative.setProtect) || this.plugin('PrivacyScreen')); },
+  canBlockShots() { return !!((window.GaznaNative && GaznaNative.setProtect) || this.plugin('PrivacyScreen')); },
   async setShotBlock(on) {
     try {
-      if (window.MirasNative && MirasNative.setProtect) return MirasNative.setProtect(on);
+      if (window.GaznaNative && GaznaNative.setProtect) return GaznaNative.setProtect(on);
       const p = this.plugin('PrivacyScreen'); if (p) return on ? p.enable() : p.disable();
     } catch (e) { console.warn('shot', e); }
   },
@@ -18,14 +18,14 @@ const Native = {
   },
   async bioSave(pw) {
     const p = this.plugin('NativeBiometric'); if (!p) return false;
-    try { await p.verifyIdentity({ reason: 'Miras', title: 'Miras' }); await p.setCredentials({ username: 'miras', password: pw, server: 'miras.local' }); return true; } catch { return false; }
+    try { await p.verifyIdentity({ reason: 'Gazna', title: 'Gazna' }); await p.setCredentials({ username: 'gazna', password: pw, server: 'gazna.local' }); return true; } catch { return false; }
   },
   async bioGet() {
     const p = this.plugin('NativeBiometric'); if (!p) return null;
-    try { await p.verifyIdentity({ reason: 'Miras', title: 'Miras' }); const c = await p.getCredentials({ server: 'miras.local' }); return c.password; } catch { return null; }
+    try { await p.verifyIdentity({ reason: 'Gazna', title: 'Gazna' }); const c = await p.getCredentials({ server: 'gazna.local' }); return c.password; } catch { return null; }
   },
-  async bioClear() { try { const p = this.plugin('NativeBiometric'); if (p) await p.deleteCredentials({ server: 'miras.local' }); } catch { } },
-  async hasBioCreds() { try { const p = this.plugin('NativeBiometric'); if (!p) return false; await p.getCredentials({ server: 'miras.local' }); return true; } catch { return false; } },
+  async bioClear() { try { const p = this.plugin('NativeBiometric'); if (p) await p.deleteCredentials({ server: 'gazna.local' }); } catch { } },
+  async hasBioCreds() { try { const p = this.plugin('NativeBiometric'); if (!p) return false; await p.getCredentials({ server: 'gazna.local' }); return true; } catch { return false; } },
   // status bar: light icons on our dark brown bar
   // icon colour follows what is under the bar: dark screens (lock/splash/dark theme) -> light icons, light theme -> dark icons
   async syncBar() {
@@ -46,7 +46,7 @@ const Native = {
       b = hex(cs(document.body)) || hex(getComputedStyle(document.documentElement).getPropertyValue('--bg')) || '#F6F1E9';
     }
     const k = t + b; if (k === this._barKey) return; this._barKey = k;
-    try { const P = this.plugin('MirasBars') || this.cap.registerPlugin('MirasBars'); P.set({ top: t, bottom: b }).catch(e => { this._barKey = null; console.warn('pb', e); }); } catch (e) { this._barKey = null; console.warn('pb', e); }
+    try { const P = this.plugin('GaznaBars') || this.cap.registerPlugin('GaznaBars'); P.set({ top: t, bottom: b }).catch(e => { this._barKey = null; console.warn('pb', e); }); } catch (e) { this._barKey = null; console.warn('pb', e); }
   },
   initBars() {
     this._barLight = null; this.syncBar(); this.paintBars();

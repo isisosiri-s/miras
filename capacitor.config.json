@@ -1,6 +1,6 @@
 {
-  "appId": "app.miras.archive",
-  "appName": "Miras",
+  "appId": "app.gazna.archive",
+  "appName": "Gazna",
   "webDir": "www",
   "android": { "allowMixedContent": false },
   "plugins": { "PrivacyScreen": { "enable": true }, "CapacitorHttp": { "enabled": true } }

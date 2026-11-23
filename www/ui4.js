@@ -1,5 +1,5 @@
 'use strict';
-/* Miras — reports: folders (e.g. 2026) -> months -> rows. The archive is only read, never changed. */
+/* Gazna — reports: folders (e.g. 2026) -> months -> rows. The archive is only read, never changed. */
 
 UI.rep = { f: null, m: null, pick: null };
 const REP_KINDS = ['manuscript', 'printed', 'book', 'other'];
@@ -411,4 +411,29 @@ async function repPickAdd(f, m0, R) {
   UI.rep.pick = null; renderRoute();
   const p = x => `<p>${x}</p>`;
   await ask({ title: t('rep_result', { a: added, n: recs.length }), center: true, html: p(esc(t('rep_res_scan', { a: sc, b: ns }))) + (H.rest ? p(esc(t('rep_res_rest', { a: rs, b: nrs }))) : '') + (skipped ? `<p class="rp-s">${esc(t('rep_skipped', { n: skipped }))}</p>` : ''), buttons: [{ label: t('ok'), v: true, cls: 'b1' }] });
+}
+
+// ---------- "In reports" block of the record card ----------
+// months of any folder that list this record (matched by inventory number); the block is absent when there are none
+function repsOfInv(inv) {
+  const k = invKey(inv), out = []; if (!k) return out;
+  for (const f of DB.reports) for (const m of [...f.months].sort((a, b) => b.m - a.m)) {
+    const row = m.rows.find(r => !repManual(r.kind) && invKey(r.inv) === k);
+    if (row) out.push({ f, m, row });
+  }
+  return out;
+}
+function cardRepsHtml(rec) {
+  if (!rec) return '';
+  const L = repsOfInv(rec.inv); if (!L.length) return '';
+  return `<div class="inrep" id="inRep"><div class="inrep-h">${esc(t('card_in_reports'))}</div><div class="inrep-c">${L.map(({ f, m, row }) => `<button type="button" class="inrep-chip" data-f="${f.id}" data-m="${m.id}" data-id="${row.id}">${esc(f.name)} · ${esc(repMonthName(m.m))}</button>`).join('')}</div></div>`;
+}
+function bindCardReps(host) {
+  const b = $('#inRep', host); if (!b) return;
+  b.onclick = async e => {
+    const c = e.target.closest('.inrep-chip'); if (!c) return;
+    const f = c.dataset.f, m = c.dataset.m, id = c.dataset.id;
+    if (!(await closeCard(false))) return;
+    UI.route = 'books'; goRoute('reports'); repEnter({ f, m, hl: id });
+  };
 }

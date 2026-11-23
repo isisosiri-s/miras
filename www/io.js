@@ -1,10 +1,10 @@
 'use strict';
-/* Miras I/O: files, Excel/CSV/JSON, import planning, sync merge */
+/* Gazna I/O: files, Excel/CSV/JSON, import planning, sync merge */
 
 // ---------- saving / picking files ----------
 async function saveFile(name, blob) {
-  if (window.MirasNative && MirasNative.saveFile) { // PC: false = user closed the dialog, error = disk full / no access / file busy
-    try { return await MirasNative.saveFile(name, blob); } catch (e) { console.warn('save', e); toast(t('save_fail'), 5000); return false; }
+  if (window.GaznaNative && GaznaNative.saveFile) { // PC: false = user closed the dialog, error = disk full / no access / file busy
+    try { return await GaznaNative.saveFile(name, blob); } catch (e) { console.warn('save', e); toast(t('save_fail'), 5000); return false; }
   }
   const cap = window.Capacitor;
   if (cap && cap.isNativePlatform && cap.isNativePlatform() && cap.Plugins.Filesystem && cap.Plugins.Share) {
@@ -14,10 +14,11 @@ async function saveFile(name, blob) {
     catch (e) { console.warn('save', e); toast(t('save_fail'), 5000); return false; }
     // Share rejects when the user closes the share sheet
     const share = async () => { try { await cap.Plugins.Share.share({ title: name, url: res.uri, dialogTitle: name }); return true; } catch (e) { console.warn('share', e); return false; } };
+    if (!DB.unlocked) return false; // locked meanwhile (auto-lock): never show the save sheet over the PIN screen
     const how = await ask({ title: name, sheet: true, buttons: [{ label: t('save_dev'), v: 'save', cls: 'b1' }, { label: t('save_share'), v: 'share', cls: 'b2' }, { label: t('btn_cancel'), v: null, cls: 'bd' }] });
     if (how === 'share') return share();
     if (how === 'save') {
-      let P = cap.Plugins.MirasFiles; try { P = P || cap.registerPlugin('MirasFiles'); } catch (e) { }
+      let P = cap.Plugins.GaznaFiles; try { P = P || cap.registerPlugin('GaznaFiles'); } catch (e) { }
       try { const r = await P.save({ name, mime: blob.type || 'application/octet-stream', src: res.uri }); if (r && r.saved) { toast(t('file_saved')); return true; } return false; }
       catch (e) { console.warn('save', e); return share(); }
     }
@@ -61,7 +62,7 @@ function xlsxBlob(aoa, sheetName) {
   const ws = XLSX.utils.aoa_to_sheet(aoa);
   ws['!cols'] = aoa[0].map((_, i) => ({ wch: Math.min(48, Math.max(8, ...aoa.slice(0, 200).map(r => String(r[i] ?? '').length)) + 2) }));
   if (aoa.length > 1) ws['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: aoa.length - 1, c: aoa[0].length - 1 } }) };
-  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, (sheetName || 'Miras').slice(0, 31));
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, (sheetName || 'Gazna').slice(0, 31));
   const out = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
   return new Blob([out], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
 }
@@ -72,16 +73,16 @@ function csvBlob(aoa) {
 const fileStamp = () => todayISO();
 async function exportXlsx() {
   const recs = liveRecords().sort((a, b) => a.id - b.id);
-  await saveFile(`miras-${fileStamp()}.xlsx`, xlsxBlob(exportMatrix(recs, visibleCols())));
+  await saveFile(`gazna-${fileStamp()}.xlsx`, xlsxBlob(exportMatrix(recs, visibleCols())));
 }
 async function exportCsv() {
   const recs = liveRecords().sort((a, b) => a.id - b.id);
-  await saveFile(`miras-${fileStamp()}.csv`, csvBlob(exportMatrix(recs, visibleCols())));
+  await saveFile(`gazna-${fileStamp()}.csv`, csvBlob(exportMatrix(recs, visibleCols())));
 }
 async function exportColumnXlsx(colKey) {
   const c = colDef(colKey); const idc = colDef('id'), invc = colDef('inv'), tc = colDef('title');
   const recs = liveRecords().sort((a, b) => a.id - b.id);
-  await saveFile(`miras-${colName(c).replace(/[^\wЀ-ӿ-]+/g, '_')}-${fileStamp()}.xlsx`, xlsxBlob(exportMatrix(recs, [idc, invc, tc, c])));
+  await saveFile(`gazna-${colName(c).replace(/[^\wЀ-ӿ-]+/g, '_')}-${fileStamp()}.xlsx`, xlsxBlob(exportMatrix(recs, [idc, invc, tc, c])));
 }
 
 // ---------- backup ----------
@@ -90,7 +91,7 @@ function backupPayload() {
 }
 async function createBackup() {
   const text = await sealFile(backupPayload(), DB._pw, H.enc);
-  const name = `miras-${fileStamp()}.json`;
+  const name = `gazna-${fileStamp()}.json`;
   if ((await saveFile(name, new Blob([text], { type: 'application/json' }))) === false) return null; // cancelled or failed: no false "backup done"
   H.lastBackup = Date.now(); await saveHeader();
   return name;
@@ -98,11 +99,11 @@ async function createBackup() {
 async function restoreBackup(payload) {
   if (!payload || payload.kind !== 'backup') throw new Error('format');
   loadDataObj({ records: payload.records, columns: payload.columns, colsTs: payload.colsTs, draft: null, reports: payload.reports, repTomb: payload.repTomb, repOrd: payload.repOrd });
-  DB.columns = DB.columns; scheduleSave(); await flushSave();
+  scheduleSave(); await flushSave();
   return liveRecords().length;
 }
 function deviceKind() {
-  if (window.MirasNative && MirasNative.kind) return MirasNative.kind;
+  if (window.GaznaNative && GaznaNative.kind) return GaznaNative.kind;
   if (window.Capacitor && Capacitor.isNativePlatform && Capacitor.isNativePlatform()) return 'phone';
   return 'web';
 }
@@ -296,7 +297,7 @@ async function exportDupsXlsx(plan, rv, dups) {
     aoa.push([d.id || '', d.row + 2, v.inv || '', v.title || '', v.author || '', d.kind === 'exact' ? t('imp_dup_kind_exact') : d.kind === 'name' ? t('imp_dup_kind_name') : t('imp_dup_kind_file')]);
   }
   aoa[0][1] = '#';
-  await saveFile(`miras-duplicates-${fileStamp()}.xlsx`, xlsxBlob(aoa, 'Duplicates'));
+  await saveFile(`gazna-duplicates-${fileStamp()}.xlsx`, xlsxBlob(aoa, 'Duplicates'));
 }
 
 // ---------- sync ----------
@@ -304,7 +305,7 @@ function syncPayload() {
   return { kind: 'sync', created: Date.now(), device: { id: H.deviceId, kind: deviceKind() }, columns: DB.columns, colsTs: DB.colsTs, records: DB.records, reports: DB.reports, repTomb: DB.repTomb, repOrd: DB.repOrd };
 }
 async function createSyncFile() {
-  const name = `miras-sync-${deviceKind()}-${fileStamp()}.json`;
+  const name = `gazna-sync-${deviceKind()}-${fileStamp()}.json`;
   const text = await sealFile(syncPayload(), DB._pw, H.enc);
   if ((await saveFile(name, new Blob([text], { type: 'application/json' }))) === false) return null;
   return name;
@@ -453,13 +454,13 @@ function lanEvent(ev) {
   lanRefresh();
 }
 async function lanStartPc() {
-  if (!window.MirasLan) throw new Error('net');
-  if (!LAN.reg) { MirasLan.onRequest(lanHandle); MirasLan.onEvent(lanEvent); LAN.reg = true; }
-  const r = await MirasLan.start();
+  if (!window.GaznaLan) throw new Error('net');
+  if (!LAN.reg) { GaznaLan.onRequest(lanHandle); GaznaLan.onEvent(lanEvent); LAN.reg = true; }
+  const r = await GaznaLan.start();
   if (!r || r.error) throw new Error(r && r.error === 'EADDRINUSE' ? 'port' : 'net');
   LAN.code = r.code; LAN.urls = r.urls; LAN.on = true; LAN.last = null; LAN.bad = 0;
 }
-async function lanStopPc() { if (window.MirasLan) await MirasLan.stop(); LAN.on = false; }
+async function lanStopPc() { if (window.GaznaLan) await GaznaLan.stop(); LAN.on = false; }
 const lanTimeout = (pr, ms) => Promise.race([pr, new Promise((_, rej) => setTimeout(() => rej(new Error('net')), ms))]);
 // phone side: send our data, get the merged data back, merge it too
 async function lanSyncClient(addr, code) {
@@ -468,7 +469,7 @@ async function lanSyncClient(addr, code) {
   if (!/^https?:\/\//i.test(base)) base = 'http://' + base;
   if (!/:\d+$/.test(base.replace(/^https?:\/\//i, ''))) base += ':' + LAN_PORT;
   let hello; try { const r = await lanTimeout(fetch(base + '/hello'), 15000); hello = await r.json(); } catch (_) { throw new Error('net'); }
-  if (!hello || hello.app !== 'miras') throw new Error('net');
+  if (!hello || (hello.app !== 'gazna' && hello.app !== 'miras')) throw new Error('net');
   const body = await sealFile(syncPayload(), code, true);
   let res; try { res = await lanTimeout(fetch(base + '/sync', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body }), 240000); } catch (_) { throw new Error('net'); }
   if (res.status === 403) throw new Error('code');

@@ -1,8 +1,8 @@
 'use strict';
-/* Miras boot, auto-lock, privacy cover, service worker */
+/* Gazna boot, auto-lock, privacy cover, service worker */
 
 // Windows desktop app (Electron): html.pc switches on the Windows / Fluent styles in style.css
-const IS_PC = !!(window.MirasNative && MirasNative.kind === 'pc');
+const IS_PC = !!(window.GaznaNative && GaznaNative.kind === 'pc');
 if (IS_PC) {
   document.documentElement.classList.add('pc');
   // Windows shows a tooltip on hover for icon-only buttons: reuse their aria-label
@@ -14,6 +14,7 @@ if (IS_PC) {
 
 async function afterUnlock() {
   await Native.setShotBlock(H.shot);
+  UI.firstPaint = true; // first list build waits one frame: the app frame appears (and fades in) before the heavy work
   mountShell();
   history.replaceState({ root: 1 }, '');
   if (DB.draft) { const d = DB.draft; DB.draft = null; scheduleSave(); openCard(d.isNew ? null : d.uuid, d.vals, true); }
@@ -40,7 +41,7 @@ document.addEventListener('scroll', () => { UI.lastScroll = Date.now(); }, { cap
 async function boot() {
   try { if ((navigator.hardwareConcurrency || 8) <= 4 || (navigator.deviceMemory || 4) <= 2) document.documentElement.classList.add('lite'); } catch (_) { /* ignore */ }
   const t0 = Date.now(), sp = document.getElementById('splash');
-  sp.innerHTML = logoSvg(110) + '<b>Miras</b>';
+  sp.innerHTML = logoSvg(110) + '<b>Gazna</b>';
   const hideSplash = () => setTimeout(() => { sp.classList.add('out'); setTimeout(() => sp.remove(), 450); }, Math.max(0, (IS_PC ? 0 : 900) - (Date.now() - t0))); // desktop apps open straight away, no held splash
   const ready = await loadHeader();
   document.addEventListener('visibilitychange', onVisibility);

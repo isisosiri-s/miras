@@ -1,5 +1,5 @@
 'use strict';
-/* Miras UI part 1: helpers, layers, dialogs, lock/setup, shell, books list, card */
+/* Gazna UI part 1: helpers, layers, dialogs, lock/setup, shell, books list, card */
 
 const IC = {
   back: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>',
@@ -13,6 +13,7 @@ const IC = {
   off: (s = 22) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" style="color:var(--outline)" stroke-width="2.2"><circle cx="12" cy="12" r="8"/></svg>`,
   plus: '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
   warn: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:1px"><path d="M12 3l10 18H2L12 3z"/><path d="M12 10v5M12 18h.01"/></svg>',
+  lamp: (sz = 22) => `<svg class="lampsvg" width="${sz}" height="${sz}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/></svg>`,
   trash: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>',
   up: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg>',
   down: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>',
@@ -43,7 +44,7 @@ const IC = {
 let _lid = 0;
 function logoSvg(sz) {
   const id = 'lg' + (_lid++);
-  return `<svg width="${sz}" height="${sz}" viewBox="0 0 100 100" style="flex:none"><defs><linearGradient id="${id}b" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6E4524"/><stop offset="1" stop-color="#341D0E"/></linearGradient><linearGradient id="${id}g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F0D58A"/><stop offset="1" stop-color="#B5832C"/></linearGradient></defs><rect width="100" height="100" rx="22" fill="url(#${id}b)"/><rect x="6" y="6" width="88" height="88" rx="17" fill="none" stroke="url(#${id}g)" stroke-width="1.2" opacity=".7"/><g fill="url(#${id}g)" transform="translate(50 50) scale(0.92) translate(-52.5 -50)"><path d="M20 24h4.5v52H20z"/><path d="M19 24h11l25 52H44z"/><path d="M52 76h5L80 24h-4.5z"/><path d="M76 24h9v52h-9z"/><path d="M13 22h20v3H13zM14 75h17v3H14zM40 75h20v3H40zM70 22h22v3H70zM70 75h22v3H70z"/></g></svg>`;
+  return `<svg width="${sz}" height="${sz}" viewBox="0 0 100 100" style="flex:none"><defs><linearGradient id="${id}b" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6E4524"/><stop offset="1" stop-color="#341D0E"/></linearGradient><linearGradient id="${id}g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F0D58A"/><stop offset="1" stop-color="#B5832C"/></linearGradient><linearGradient id="${id}i" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#F0D58A"/><stop offset="1" stop-color="#B5832C"/></linearGradient></defs><rect width="100" height="100" rx="22" fill="url(#${id}b)"/><rect x="6" y="6" width="88" height="88" rx="17" fill="none" stroke="url(#${id}g)" stroke-width="1.2" opacity=".7"/><path fill="url(#${id}i)" transform="translate(50 50) scale(0.0405 -0.0405) translate(-818.5 -668)" d="M1406 70Q1282 29 1118.0 4.5Q954 -20 823 -20Q604 -20 440.5 60.0Q277 140 188.5 293.0Q100 446 100 655Q100 992 292.5 1174.0Q485 1356 842 1356Q929 1356 1000.5 1349.0Q1072 1342 1134.0 1330.0Q1196 1318 1362 1271V963H1272L1248 1137Q1169 1191 1074.0 1221.0Q979 1251 878 1251Q645 1251 538.5 1106.0Q432 961 432 657Q432 374 544.5 228.5Q657 83 870 83Q986 83 1091 118V506L919 532V606H1537V532L1406 506Z"/></svg>`;
 }
 
 const UI = {
@@ -110,7 +111,7 @@ function ask({ title, text, html, buttons, onMount, dismiss = true, sheet = fals
       finish(def.v === undefined ? true : (typeof def.v === 'function' ? def.v(mb) : def.v));
     });
     if (onMount) onMount(mb, finish);
-    const f = mb.querySelector('input,select,textarea'); if (f && !/ro/.test(f.className)) setTimeout(() => f.focus(), 50);
+    const f = mb.querySelector('input,select,textarea'); if (f && !/ro/.test(f.className)) setTimeout(() => (f._ddBtn || f).focus(), 50);
   });
 }
 const confirmDlg = (text, okLabel, bad) => ask({ title: t('conf_title'), text, buttons: [{ label: t('btn_cancel'), v: false, cls: 'b2' }, { label: okLabel || t('ok'), v: true, cls: bad ? 'bad' : 'b1' }] });
@@ -208,7 +209,6 @@ function mountPad(root, { fixed = 0, max = 6, onChange, onDone }) {
 }
 
 let _lockTimer = null;
-const digitsOnly = el => { el.value = el.value.replace(/\D/g, '').slice(0, 6); };
 async function showLock() {
   UI.layers = []; clearInterval(_lockTimer);
   const el = appEl();
@@ -216,7 +216,7 @@ async function showLock() {
   const bioBtn = bioOk ? `<button type="button" id="bio" class="bio" aria-label="${esc(t('lock_bio'))}">${IC.finger.replace('currentColor', '#E3D3B4')}</button>` : '';
   el.innerHTML = `<div class="lockscr"><div class="lockbox pinbox">${langRow()}
     <div style="display:flex;justify-content:center">${logoSvg(72)}</div>
-    <h1>Miras</h1><div class="sub">${t('tagline')}</div>
+    <h1>Gazna</h1>
     ${padHtml(bioBtn)}
     <div class="msg" id="msg"></div>
     <div class="foot">${IC.lock(14, '#CDBB9D')} ${t('lock_encrypted')}</div></div></div>`;
@@ -284,9 +284,11 @@ function showSetup() {
 const NAV = [['books', 'nav_books', 'book'], ['stats', 'nav_stats', 'stats'], ['reports', 'nav_reports', 'report'], ['trash', 'nav_trash', 'trashn'], ['columns', 'nav_columns', 'cols'], ['ie', 'nav_import', 'imp'], ['sync', 'nav_sync', 'sync'], ['settings', 'nav_settings', 'gear']];
 function mountShell() {
   UI.route = 'books'; UI.routeLayer = null; UI.card = null;
+  UI.sort = H.sort && H.sort.key && colDef(H.sort.key) && (H.sort.dir === 1 || H.sort.dir === -1) ? { key: H.sort.key, dir: H.sort.dir } : null;
   appEl().innerHTML = `<div class="shell" id="shell">
+    <button class="sidebtn" id="sideBtn" aria-haspopup="menu" aria-label="${esc(t('side_menu'))}">${IC.menu}</button>
     <aside class="side">
-      <div class="brand">${logoSvg(44)}<div><b>Miras</b><span>${t('tagline')}</span></div></div>
+      <div class="brand">${logoSvg(44)}<div><b>Gazna</b></div></div>
       ${NAV.map(([k, lab, ic]) => `<button class="nav" data-r="${k}" aria-label="${esc(t(lab))}">${IC[ic]}<span>${t(lab)}</span></button>`).join('')}
       <div class="sp"></div>
       <div class="lg">${['tk', 'ru', 'en'].map(l => `<button data-l="${l}" class="${H.lang === l ? 'on' : ''}">${l.toUpperCase()}</button>`).join('')}</div>
@@ -294,10 +296,33 @@ function mountShell() {
     </aside>
     <section class="main" id="main"></section>
     <div id="cardhost"></div></div>`;
+  applySide(); { const sb = $('#sideBtn'); if (sb) sb.onclick = () => sideMenu(sb); }
   $$('.side .nav[data-r]').forEach(b => b.onclick = () => goRoute(b.dataset.r));
   $$('.side .lg button').forEach(b => b.onclick = () => setLang(b.dataset.l));
   if ($('#navlock')) $('#navlock').onclick = () => doLock();
   renderRoute();
+}
+// ---- sidebar: full / narrow (icons) / hidden (PC, tablet, wide landscape phone). Local setting; default hidden ----
+const SIDE_MODES = ['full', 'narrow', 'hidden'];
+const sideMode = () => (SIDE_MODES.includes(H.side) ? H.side : 'hidden');
+function applySide() { const sh = $('#shell'); if (sh) SIDE_MODES.forEach(m => sh.classList.toggle('side-' + m, m === sideMode())); }
+function setSide(m) {
+  if (!SIDE_MODES.includes(m)) return; if (m !== 'hidden') H.sideLast = m; H.side = m; saveHeader(); applySide();
+  const v = UI.vr; if (v) { v.from = -1; renderWindow(true); }
+}
+function toggleSide() { setSide(sideMode() === 'hidden' ? (H.sideLast || 'full') : 'hidden'); } // Ctrl+B
+function sideMenu(btn) {
+  document.querySelectorAll('.sidemenu').forEach(e => e.remove());
+  const m = document.createElement('div'); m.className = 'sidemenu'; m.setAttribute('role', 'menu');
+  const cur = sideMode();
+  m.innerHTML = [['full', 'side_full'], ['narrow', 'side_narrow'], ['hidden', 'side_hidden']].map(([k, l]) => `<button role="menuitem" data-m="${k}"><span class="ck">${k === cur ? IC.ok(16) : ''}</span>${esc(t(l))}</button>`).join('');
+  const r = btn.getBoundingClientRect(); m.style.left = r.left + 'px'; m.style.top = r.bottom + 4 + 'px'; document.body.appendChild(m);
+  const close = () => { m.remove(); document.removeEventListener('pointerdown', out, true); document.removeEventListener('keydown', key, true); };
+  const out = e => { if (!m.contains(e.target) && e.target !== btn && !btn.contains(e.target)) close(); };
+  const key = e => { if (e.key === 'Escape') { e.stopPropagation(); close(); btn.focus(); } };
+  m.addEventListener('click', e => { const b = e.target.closest('[data-m]'); if (b) { close(); setSide(b.dataset.m); } });
+  document.addEventListener('pointerdown', out, true); document.addEventListener('keydown', key, true);
+  const f = m.querySelector('button'); if (f) f.focus();
 }
 async function setLang(l) {
   H.lang = l; applyPrefs(); await saveHeader();
@@ -370,7 +395,6 @@ function layout(cols) {
   for (const c of cols) { const w = colW(c); if (c.kind === 'id') L.id = x; else if (c.key === 'inv') L.inv = x; ws.push(w); x += w; }
   return { tpl: ws.map(w => w + 'px').join(' '), L, total: x };
 }
-function gridTpl(cols) { return layout(cols).tpl; }
 function applyLayout(cols) {
   const tw = $('#tw'); if (!tw) return; const o = layout(cols);
   tw.style.setProperty('--tpl', o.tpl);
@@ -393,6 +417,7 @@ function computeList() {
   const toks = norm(UI.q).split(' ').filter(Boolean);
   let l = DB.records.filter(isLive);
   if (UI.filter === 'scanned') l = l.filter(r => r.scanned); else if (UI.filter === 'not') l = l.filter(r => !r.scanned);
+  else if (UI.filter === 'pin') l = l.filter(r => r.pin);
   else if (UI.filter === 'rest') l = l.filter(r => r.restored); else if (UI.filter === 'notrest') l = l.filter(r => !r.restored);
   else if (UI.filter === 'recent') { const lim = Date.now() - 7 * 86400000; l = l.filter(r => (r.ts || 0) >= lim || (r.created || 0) >= lim); }
   if (toks.length) l = l.filter(r => { const s = searchKey(r); return toks.every(x => s.includes(x)); });
@@ -406,7 +431,7 @@ function computeList() {
 }
 function viewBooks(main) {
   main.classList.remove('hdrhide');
-  main.innerHTML = `${mobBar('Miras')}
+  main.innerHTML = `${mobBar('Gazna')}
   <div class="toolbar"><div class="trow"><div class="search">${IC.search}<input id="q" type="search" placeholder="${esc(t('search_ph'))}" value="${esc(UI.q)}" autocomplete="off"></div>
     <button class="sbtn only-wide" id="bImp">${IC.imp}${t('btn_import')}</button><button class="sbtn only-wide" id="bExp">${IC.imp.replace('M12 3v12M7 10l5 5 5-5', 'M12 15V3M7 8l5-5 5 5')}${t('btn_export')}</button><button class="sbtn pri only-wide" id="bNew">${IC.plus.replace('width="26" height="26"', 'width="18" height="18"')}${t('btn_new')}</button></div>
     <div class="chips" id="chips"></div></div>
@@ -438,13 +463,14 @@ function viewBooks(main) {
   rows.addEventListener('touchcancel', cancelLp, { passive: true });
   $('#tw').addEventListener('scroll', cancelLp, { passive: true });
   rows.addEventListener('contextmenu', e => { if (e.target.closest('.tr')) e.preventDefault(); });
-  bindCellEdit();
-  refreshList();
+  // wide screens: the card overlays the list; a click on empty list space closes it (rows open their own card)
+  $('#tw').addEventListener('click', e => { if (UI.card && isWide() && !e.target.closest('.tr,.th')) closeCard(false); });
+  if (UI.firstPaint) { UI.firstPaint = false; requestAnimationFrame(() => setTimeout(() => { if ($('#rows')) refreshList(); }, 0)); } else refreshList();
 }
 function renderChips() {
   const c = $('#chips'); if (!c) return;
   const rf = H.rest && H.restUi, nf = Object.keys(UI.colf || {}).length;
-  c.innerHTML = [['all', t('f_all')], ['scanned', IC.ok(14) + t('f_scanned')], ['not', IC.off(14) + t('f_notscanned')], ...(rf ? [['rest', IC.ok(14) + t('f_rest')], ['notrest', IC.off(14) + t('f_notrest')]] : []), ['recent', t('f_recent')]].map(([k, l]) => `<button class="chip ${UI.filter === k ? 'on' : ''}" data-f="${k}">${l}</button>`).join('') + (nf ? `<button class="chip clr" data-f="__clr">${IC.no(14)}${t('f_clear_cols', { n: nf })}</button>` : '');
+  c.innerHTML = [['all', t('f_all')], ['scanned', IC.ok(14) + t('f_scanned')], ['not', IC.off(14) + t('f_notscanned')], ...(rf ? [['rest', IC.ok(14) + t('f_rest')], ['notrest', IC.off(14) + t('f_notrest')]] : []), ['recent', t('f_recent')], ...((UI.filter === 'pin' || DB.records.some(r => r.pin && isLive(r))) ? [['pin', IC.lamp(14) + t('f_pinned')]] : [])].map(([k, l]) => `<button class="chip ${UI.filter === k ? 'on' : ''}" data-f="${k}">${l}</button>`).join('') + (nf ? `<button class="chip clr" data-f="__clr">${IC.no(14)}${t('f_clear_cols', { n: nf })}</button>` : '');
   $$('.chip', c).forEach(b => b.onclick = () => { if (b.dataset.f === '__clr') UI.colf = {}; else UI.filter = b.dataset.f; renderChips(); refreshList(); const w = $('#tw'); if (w) w.scrollTop = 0; });
 }
 function rowHtml(r, cols, tpl) {
@@ -458,13 +484,13 @@ function rowHtml(r, cols, tpl) {
     return `<span class="${c.key === 'inv' ? 'inv' + stk(SL, 'inv') : 'tx'}"><i>${esc(cellText(c, r))}</i></span>`;
   }).join('');
   const cur = UI.card && UI.card.uuid === r.uuid ? ' cur' : '';
-  return `<div class="tr${sel ? ' sel' : ''}${cur}" data-u="${r.uuid}">${cb}${cells}</div>`;
+  return `<div class="tr${sel ? ' sel' : ''}${cur}${r.pin ? ' pin' : ''}${UI.hlU === r.uuid ? ' hl' : ''}" data-u="${r.uuid}">${cb}${cells}</div>`;
 }
 function renderHead(cols, tpl) {
   const th = $('#th'); if (!th) return;
   const showCb = isWide() || UI.selMode;
   const SL = stickyLefts(cols);
-  th.innerHTML = (showCb ? `<span class="${stk(SL, 'cb').slice(1)}"></span>` : '') + cols.map(c => `<span data-k="${c.key}" class="${c.kind === 'number' ? 'num' : c.kind === 'check' ? 'mid' : ''}${UI.colf && UI.colf[c.key] ? ' flt' : ''}${c.kind === 'id' ? stk(SL, 'id') : c.key === 'inv' ? stk(SL, 'inv') : ''}"><i>${esc(colName(c))}${UI.sort && UI.sort.key === c.key ? (UI.sort.dir > 0 ? ' ▲' : ' ▼') : ''}</i><u class="rz" data-k="${c.key}"></u></span>`).join('');
+  th.innerHTML = (showCb ? `<span class="${stk(SL, 'cb').slice(1)}"></span>` : '') + cols.map(c => `<span data-k="${c.key}" class="${UI.sort && UI.sort.key === c.key ? 'srt ' : ''}${c.kind === 'number' ? 'num' : c.kind === 'check' ? 'mid' : ''}${UI.colf && UI.colf[c.key] ? ' flt' : ''}${c.kind === 'id' ? stk(SL, 'id') : c.key === 'inv' ? stk(SL, 'inv') : ''}"><i>${esc(colName(c))}${UI.sort && UI.sort.key === c.key ? (UI.sort.dir > 0 ? ' ▲' : ' ▼') : ''}</i><u class="rz" data-k="${c.key}"></u></span>`).join('');
 }
 function bindResize() {
   const th = $('#th'); if (!th) return;
@@ -480,7 +506,7 @@ function bindResize() {
   th.addEventListener('click', e => { if (e.target.closest('.rz')) { e.stopPropagation(); return; } const sp = e.target.closest('#th>span[data-k]'); if (sp) colMenu(sp.dataset.k); });
 }
 // ---- virtualised list: only the rows near the viewport exist in the DOM (fixed row height) ----
-const VBUF = 10;
+const VBUF = 24, VMARGIN = 8; // rows kept above / below the viewport; the window is rebuilt only when the view gets within VMARGIN rows of its edge
 UI.sort = null; UI.colf = {};
 UI.vr = { rh: 66, from: -1, to: -1, cols: null, raf: 0 };
 // row height = font size x --row-em (4.1 on phones: two-line titles, big touch rows; denser on the Windows app)
@@ -491,13 +517,21 @@ function renderWindow(force) {
   const rowsTop = rows.getBoundingClientRect().top - tw.getBoundingClientRect().top + tw.scrollTop;
   const top = Math.max(0, tw.scrollTop - rowsTop), h = tw.clientHeight || 600;
   const vis0 = Math.floor(top / rh), vis1 = Math.min(n, Math.ceil((top + h) / rh));
-  if (!force && v.from >= 0 && (vis0 >= v.from + 3 || v.from === 0) && (vis1 <= v.to - 3 || v.to === n)) return;
+  if (!force && v.from >= 0 && (vis0 >= v.from + VMARGIN || v.from === 0) && (vis1 <= v.to - VMARGIN || v.to === n)) return;
   const from = Math.max(0, Math.min(n - 1, vis0 - VBUF)), to = Math.min(n, vis1 + VBUF);
-  v.from = from; v.to = to;
+  const of = v.from, ot = v.to;
   rows.style.paddingTop = from * rh + 'px'; rows.style.paddingBottom = (n - to) * rh + 'px';
-  rows.innerHTML = list.slice(from, to).map(r => rowHtml(r, v.cols, '')).join('');
+  if (!force && of >= 0 && v.list === list && v.cols === v.shown && from < ot && to > of && rows.children.length === ot - of) {
+    // scrolled a little: keep the rows that are still in the window, drop the ones that left, add only the new ones
+    const keepFrom = Math.max(of, from), keepTo = Math.min(ot, to);
+    for (let i = of; i < keepFrom; i++) rows.removeChild(rows.firstChild);
+    for (let i = keepTo; i < ot; i++) rows.removeChild(rows.lastChild);
+    if (from < keepFrom) rows.insertAdjacentHTML('afterbegin', list.slice(from, keepFrom).map(r => rowHtml(r, v.cols, '')).join(''));
+    if (to > keepTo) rows.insertAdjacentHTML('beforeend', list.slice(keepTo, to).map(r => rowHtml(r, v.cols, '')).join(''));
+  } else rows.innerHTML = list.slice(from, to).map(r => rowHtml(r, v.cols, '')).join('');
+  v.from = from; v.to = to; v.list = list; v.shown = v.cols;
 }
-const LAND_SHORT = '(orientation:landscape) and (max-height:520px)';
+const LAND_SHORT = '(max-height:520px)';
 function onListScroll() {
   const v = UI.vr; if (v.raf) return;
   v.raf = requestAnimationFrame(() => {
@@ -543,7 +577,7 @@ function bindRail() {
 }
 
 // ---- column header menu: sort, filter, auto width, hide ----
-function setSort(key, dir) { UI.sort = dir ? { key, dir } : null; refreshList(); }
+function setSort(key, dir) { UI.sort = dir ? { key, dir } : null; H.sort = UI.sort ? { ...UI.sort } : null; saveHeader(); refreshList(); } // the chosen order is a setting of THIS device (not synced)
 function autoFit(c) {
   const cv = document.createElement('canvas').getContext('2d'); const fs = parseFloat(getComputedStyle(document.documentElement).fontSize) * 0.9;
   cv.font = `${fs}px Inter, system-ui, sans-serif`; let mx = cv.measureText(colName(c)).width + 24;
@@ -555,7 +589,7 @@ async function colMenu(key) {
   const c = colDef(key); if (!c) return;
   const sorted = UI.sort && UI.sort.key === key ? UI.sort.dir : 0, filt = !!(UI.colf && UI.colf[key]);
   const items = [['asc', t('m_sort_asc'), sorted === 1], ['desc', t('m_sort_desc'), sorted === -1]];
-  if (sorted) items.push(['sort0', t('m_sort_off')]);
+  if (UI.sort) items.push(['sort0', t('m_sort_off')]);
   if (c.kind !== 'id') items.push(['filter', t('m_filter'), filt]); if (filt) items.push(['filter0', t('m_filter_off')]);
   items.push(['fit', t('m_fit')]);
   if (c.kind !== 'id' && !(builtinOf(c.key) || {}).noHide) items.push(['hide', t('m_hide')]);
@@ -623,7 +657,7 @@ function renderBanner(total) {
   if (!total.total) { b.innerHTML = ''; return; }
   const d = H.lastBackup ? Math.floor((Date.now() - H.lastBackup) / 86400000) : null;
   if (d !== null && d <= 7) { b.innerHTML = ''; return; }
-  b.innerHTML = `<div class="banner">${IC.warn}<span>${d === null ? t('backup_never') : t('backup_remind', { d })}</span><button class="sbtn" id="bkBtn">${t('set_backup_btn')}</button></div>`;
+  b.innerHTML = `<div class="banner">${IC.warn}<span>${d === null ? t('backup_never') : t('backup_remind', { d, w: noun('day', d) })}</span><button class="sbtn" id="bkBtn">${t('set_backup_btn')}</button></div>`;
   $('#bkBtn').onclick = async () => { const n = await createBackup(); if (n) toast(t('backup_done', { f: n })); renderBanner(counts()); };
 }
 // selection
@@ -656,10 +690,12 @@ function renderSelbar() {
   s.innerHTML = `<button class="sb" id="sbX" aria-label="${esc(t('close'))}">${IC.close}</button><span>${t('sel_count', { n: UI.sel.size })}</span>
     <button class="sb" id="sbAll">${t('sel_all')}</button>
     <button class="sb" id="sbMark">${IC.ok(14, '#fff')}&nbsp;${t('sel_mark')}</button>
+    <button class="sb" id="sbPin">${IC.lamp(14)}&nbsp;${selRecords().length && selRecords().every(r => r.pin) ? t('pin_off') : t('pin_on')}</button>
     <button class="sb" id="sbChg">${t('sel_change')}</button>
     <button class="sb del" id="sbDel">${t('btn_delete')}</button>`;
   $('#sbAll').onclick = () => { computeList().forEach(r => UI.sel.add(r.uuid)); UI.selMode = true; refreshList(); };
   $('#sbX').onclick = () => clearSel();
+  $('#sbPin').onclick = () => { const rs = selRecords(), on = !rs.every(r => r.pin); rs.forEach(r => updateRecord(r, { pin: on })); toast(t(on ? 'pin_done' : 'unpin_done', { n: rs.length })); clearSel(); };
   $('#sbMark').onclick = () => { const rs = selRecords().filter(r => !r.scanned); rs.forEach(r => updateRecord(r, { scanned: true })); toast(t('mass_done', { n: rs.length })); clearSel(); };
   $('#sbDel').onclick = async () => {
     const rs = selRecords(); if (!rs.length) return;
@@ -680,7 +716,7 @@ function fieldInputHtml(c, val, id, opt = {}) {
   // a value that is not a valid ISO date (old import, typed elsewhere) is shown as text: a date input would show it empty and saving would erase it
   if (c.kind === 'date') return v === '' || isIsoDate(v) ? `<input class="inp" id="${id}" type="date" value="${esc(v)}">` : `<input class="inp" id="${id}" autocomplete="off" value="${esc(v)}">`;
   if (c.kind === 'number') return `<input class="inp" id="${id}" inputmode="decimal" autocomplete="off" value="${esc(typeof v === 'number' ? String(v).replace('.', LANG === 'en' ? '.' : ',') : v)}">`;
-  return `<input class="inp" id="${id}" autocomplete="off" value="${esc(v)}" ${opt.list ? `list="${opt.list}"` : ''}>`;
+  return `<input class="inp" id="${id}" autocomplete="off" value="${esc(v)}">`;
 }
 function bindCheckButtons(root) {
   $$('[data-check]', root).forEach(b => b.onclick = () => {
@@ -736,53 +772,54 @@ function cardDefaults() {
   if (last.lang) vals.lang = last.lang; if (last.loc) vals.loc = last.loc;
   return vals;
 }
-function datalist(key) {
-  const s = new Set(); for (const r of DB.records) if (isLive(r) && r[key]) { s.add(r[key]); if (s.size > 300) break; }
-  return `<datalist id="dl_${key}">${[...s].sort().map(v => `<option value="${esc(v)}">`).join('')}</datalist>`;
-}
 
 // ---------- "storage place" (loc): custom dropdown instead of the native <datalist> ----------
 // The Electron datalist popup shows ~20 entries and does not scroll (values like DVD-77 were unreachable).
 // Empty field: the 3 most recently used places, newest first. Typing: ALL matching places (same
 // normalisation as the main search), virtualised so thousands of values scroll without lag. Free text stays allowed.
-const LOC_RECENT = 3;
-let _locIdx = null;
-function locIndex() {
-  if (_locIdx && _locIdx.rev === DB.rev) return _locIdx;
-  const last = new Map(); // place -> latest time a live record with it was created / edited
+// Same dropdown for storage place, language and author. Empty field: place / language show the 3 most recently
+// used values (newest first), author shows nothing until the user types.
+const COMBO_RECENT = { loc: 3, lang: 3, author: 0 };
+const _cIdx = {};
+function comboIndex(key) {
+  const c = _cIdx[key]; if (c && c.rev === DB.rev) return c;
+  const last = new Map(); // value -> latest time a live record with it was created / edited
   for (const r of DB.records) {
     if (!isLive(r)) continue;
-    const v = String(r.loc ?? '').trim(); if (!v) continue;
+    const v = String(r[key] ?? '').trim(); if (!v) continue;
     const at = Math.max(r.ts || 0, r.created || 0);
     if (!(last.get(v) >= at)) last.set(v, at);
   }
   const items = [...last].map(([v, at]) => ({ v, at, n: norm(v) }));
-  const recent = items.slice().sort((a, b) => b.at - a.at).slice(0, LOC_RECENT).map(x => x.v);
+  const recent = items.slice().sort((a, b) => b.at - a.at).slice(0, COMBO_RECENT[key] || 0).map(x => x.v);
   const coll = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' }); // DVD-9 before DVD-10
   items.sort((a, b) => coll.compare(a.v, b.v));
-  _locIdx = { rev: DB.rev, items, recent };
-  return _locIdx;
+  return (_cIdx[key] = { rev: DB.rev, items, recent });
 }
-function locMatches(q) {
-  const I = locIndex(), toks = norm(q).split(' ').filter(Boolean);
+function comboMatches(key, q) {
+  const I = comboIndex(key), toks = norm(q).split(' ').filter(Boolean);
   if (!toks.length) return I.recent;
   const pre = [], rest = []; // values starting with the typed text first, then the other matches
   for (const x of I.items) if (toks.every(k => x.n.includes(k))) (x.n.startsWith(toks[0]) ? pre : rest).push(x.v);
   return pre.concat(rest);
 }
-function bindLocCombo(root) {
-  const inp = $('#f_loc', root); if (!inp) return;
+const locMatches = q => comboMatches('loc', q); // kept for the tests
+function bindCombo(root, key) {
+  const inp = $('#f_' + key, root); if (!inp) return;
   const wrap = inp.parentElement; wrap.classList.add('combo');
-  const box = document.createElement('div'); box.className = 'combo-list hidden'; box.id = 'f_loc_list'; box.setAttribute('role', 'listbox');
+  const box = document.createElement('div'); box.className = 'combo-list hidden'; box.id = 'f_' + key + '_list'; box.setAttribute('role', 'listbox');
   const sizer = document.createElement('div'); sizer.className = 'combo-sizer'; box.appendChild(sizer); wrap.appendChild(box);
   inp.setAttribute('role', 'combobox'); inp.setAttribute('aria-autocomplete', 'list'); inp.setAttribute('aria-controls', box.id); inp.setAttribute('aria-expanded', 'false');
-  let list = [], hi = -1, open = false, R = 44, muted = false, raf = 0;
+  // list[0] is the best / newest match. Opening upward shows it NEAREST to the field (reversed visually).
+  let list = [], hi = -1, open = false, R = 44, muted = false, raf = 0, up = false;
   const rowH = () => Math.round(parseFloat(getComputedStyle(document.documentElement).fontSize) * 2.75); // 44px phone, ~38px PC
+  const topOf = i => (up ? list.length - 1 - i : i) * R;
   // only the rows in view exist in the DOM
   const render = () => {
     raf = 0; if (!open) return;
-    const from = Math.max(0, Math.floor(box.scrollTop / R) - 4), to = Math.min(list.length, from + Math.ceil((box.clientHeight || 300) / R) + 8);
-    let h = ''; for (let i = from; i < to; i++) h += `<div class="combo-it${i === hi ? ' on' : ''}" role="option" data-i="${i}" style="top:${i * R}px;height:${R}px">${esc(list[i])}</div>`;
+    const n = list.length, vis = Math.floor(box.scrollTop / R), cnt = Math.ceil((box.clientHeight || 300) / R) + 8;
+    let lo = Math.max(0, vis - 4), hiI = Math.min(n, lo + cnt);
+    let h = ''; for (let k = lo; k < hiI; k++) { const i = up ? n - 1 - k : k; h += `<div class="combo-it${i === hi ? ' on' : ''}" role="option" data-i="${i}" style="top:${k * R}px;height:${R}px">${esc(list[i])}</div>`; }
     sizer.innerHTML = h;
   };
   // below the field, or above it when there is no room below (landscape phone, keyboard open, bottom of the card)
@@ -791,9 +828,10 @@ function bindLocCombo(root) {
     const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
     const below = Math.min(sr.bottom, vh) - ir.bottom - 8, above = ir.top - Math.max(sr.top, 0) - (ir.top - wrap.getBoundingClientRect().top) - 8;
     const want = Math.min(list.length, 6.5) * R; // half a row peeks out: the list visibly scrolls
-    const up = below < Math.min(want, R * 3.5) && above > below;
+    const wasUp = up; up = below < Math.min(want, R * 3.5) && above > below;
     box.classList.toggle('up', up);
     box.style.maxHeight = Math.max(R * 2, Math.min(want, up ? above : below)) + 'px';
+    if (up !== wasUp || !open) box.scrollTop = up ? box.scrollHeight : 0;
   };
   const card = inp.closest('.cardbody');
   const hide = () => { if (!open) return; open = false; hi = -1; box.classList.add('hidden'); inp.setAttribute('aria-expanded', 'false'); if (card) card.classList.remove('combo-room'); };
@@ -807,21 +845,26 @@ function bindLocCombo(root) {
     card.scrollTop += wrap.getBoundingClientRect().top - sr.top - 4;
   };
   const show = () => {
-    list = locMatches(inp.value); hi = -1;
+    list = comboMatches(key, inp.value); hi = -1;
     if (!list.length) return hide();
-    open = true; R = rowH(); box.classList.remove('hidden'); inp.setAttribute('aria-expanded', 'true');
-    sizer.style.height = list.length * R + 'px'; box.scrollTop = 0; makeRoom(); place(); render();
+    box.scrollTop = 0; R = rowH(); sizer.style.height = list.length * R + 'px';
+    box.classList.remove('hidden'); open = true; inp.setAttribute('aria-expanded', 'true');
+    makeRoom(); place(); render();
   };
   const pick = v => { inp.value = v; hide(); muted = true; inp.dispatchEvent(new Event('input', { bubbles: true })); muted = false; }; // input event: dirty check + duplicate check
-  const seeHi = () => { const top = hi * R; if (top < box.scrollTop) box.scrollTop = top; else if (top + R > box.scrollTop + box.clientHeight) box.scrollTop = top + R - box.clientHeight; render(); };
-  inp.addEventListener('focus', show);
+  const seeHi = () => { const top = topOf(hi); if (top < box.scrollTop) box.scrollTop = top; else if (top + R > box.scrollTop + box.clientHeight) box.scrollTop = top + R - box.clientHeight; render(); };
+  // arriving with the arrow keys (card navigation) keeps the list closed; mouse / Tab / touch open it
+  inp.addEventListener('focus', () => { if (inp._quiet) { inp._quiet = false; return; } show(); });
   inp.addEventListener('input', () => { if (!muted) show(); });
   inp.addEventListener('keydown', e => {
-    if (e.key === 'ArrowDown') { e.preventDefault(); if (!open) return show(); hi = Math.min(list.length - 1, hi + 1); seeHi(); }
-    else if (e.key === 'ArrowUp') { if (!open) return; e.preventDefault(); hi = Math.max(0, hi - 1); seeHi(); }
-    else if (e.key === 'Enter') { if (open && hi >= 0) { e.preventDefault(); pick(list[hi]); } }
+    if (e.key === 'Enter') { if (open && hi >= 0) { e.preventDefault(); e.stopPropagation(); pick(list[hi]); } else if (!open) { e.preventDefault(); show(); } else e.preventDefault(); }
     else if (e.key === 'Escape') { if (open) { e.preventDefault(); e.stopPropagation(); hide(); } } // close the list, not the card
     else if (e.key === 'Tab') hide();
+    else if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && open) {
+      e.preventDefault(); e.stopPropagation();
+      const d = (e.key === 'ArrowDown' ? 1 : -1) * (up ? -1 : 1); // visually down = towards the field when the list is above
+      hi = hi < 0 ? (d > 0 || up ? 0 : list.length - 1) : Math.max(0, Math.min(list.length - 1, hi + d)); seeHi();
+    }
   });
   box.addEventListener('scroll', () => { if (!raf) raf = requestAnimationFrame(render); }, { passive: true });
   box.addEventListener('mousedown', e => e.preventDefault()); // mouse: keep the focus (and caret) in the field
@@ -835,6 +878,7 @@ function bindLocCombo(root) {
   document.addEventListener('pointerdown', outside, true); document.addEventListener('focusin', focusIn);
   window.addEventListener('resize', relayout); if (window.visualViewport) window.visualViewport.addEventListener('resize', relayout);
 }
+const bindCombos = root => ['loc', 'lang', 'author'].forEach(k => bindCombo(root, k));
 async function openCard(uuid, draftVals, silentRerender, presetType) {
   if (UI.card && !silentRerender) {
     if (UI.card.uuid === uuid && !!uuid) return;
@@ -850,22 +894,23 @@ async function openCard(uuid, draftVals, silentRerender, presetType) {
   const body = cols.map(c => {
     if (c.kind === 'id') return '';
     const half = ['type', 'pages', 'lang', 'date'].includes(c.key) || (!c.b && ['number', 'date', 'list'].includes(c.kind));
-    const dl = ['lang', 'author'].includes(c.key) ? c.key : null; // loc: custom dropdown (bindLocCombo), not a datalist
     const lbl = c.kind === 'check' ? '' : `<div class="lbl">${esc(colName(c, true))}</div>`;
-    let inner = lbl + fieldInputHtml(c, vals[c.key], 'f_' + c.key, { list: dl ? 'dl_' + dl : null }) + (dl ? datalist(dl) : '') + (c.key === 'inv' ? '<div class="ferr hidden" id="invErr"></div>' : '');
+    let inner = lbl + fieldInputHtml(c, vals[c.key], 'f_' + c.key) + (c.key === 'inv' ? '<div class="ferr hidden" id="invErr"></div>' : '');
     if (c.key === 'inv') {
       return `<div style="display:flex;gap:10px;flex:1 1 100%"><div class="fld" style="flex:0 0 72px"><div class="lbl">${t('col_id')}</div><input class="inp ro" disabled value="${isNew ? '' : (rec.id)}"></div><div class="fld" style="flex:1">${inner}</div></div>`;
     }
     return `<div class="fld ${half ? 'half' : ''}">${inner}</div>`;
   }).join('');
-  host.innerHTML = `<div class="cardhead"><button class="ib backb" id="cBack">${IC.back}</button><h3 id="cTitle">${cardTitleOf(isNew, vals.type)}</h3>${!isNew ? `<button class="ib" id="cDel" aria-label="${esc(t('btn_delete'))}">${IC.trash}</button>` : ''}<button class="ib only-wide" id="cX" aria-label="${esc(t('close'))}">${IC.close}</button></div>
-    <div class="cardbody" id="cBody">${body}<div class="warn hidden" id="dupWarn">${IC.warn}<span></span></div></div>
+  host.innerHTML = `<div class="cardhead"><button class="ib backb" id="cBack">${IC.back}</button><h3 id="cTitle">${cardTitleOf(isNew, vals.type)}</h3>${!isNew ? `<button class="ib lamp${rec && rec.pin ? ' on' : ''}" id="cPin" aria-pressed="${rec && rec.pin ? 'true' : 'false'}" aria-label="${esc(t(rec && rec.pin ? 'pin_off' : 'pin_on'))}">${IC.lamp(22)}</button><button class="ib" id="cDel" aria-label="${esc(t('btn_delete'))}">${IC.trash}</button>` : ''}<button class="ib only-wide" id="cX" aria-label="${esc(t('close'))}">${IC.close}</button></div>
+    <div class="cardbody" id="cBody">${body}<div class="warn hidden" id="dupWarn">${IC.warn}<span></span></div>${isNew ? '' : cardRepsHtml(rec)}</div>
     <div class="actions"><!-- no Cancel: the back arrow (and X on PC) already leaves the card -->${isNew ? `<button class="btn b2" id="cNext">${t('card_save_next')}</button>` : ''}<button class="btn b1" id="cSave">${t('btn_save')}</button></div>`;
   host.classList.add('on'); $('#shell').classList.add('hascard');
-  bindCheckButtons(host); bindLocCombo(host);
+  bindCheckButtons(host); bindCombos(host); bindCardReps(host);
   UI.card.init = JSON.stringify(readCard());
   if (draftVals) applyCardVals(draftVals);
   { const tt = $('#f_type', host); if (tt) tt.addEventListener('change', () => { $('#cTitle').textContent = cardTitleOf(UI.card.isNew, tt.value); }); }
+  if ($('#cPin')) $('#cPin').onclick = () => togglePin();
+  host.classList.toggle('pinned', !!(rec && rec.pin));
   $('#cBack').onclick = () => history.back();
   $('#cX').onclick = () => closeCard(false);
   $('#cSave').onclick = () => saveCard(false);
@@ -921,6 +966,14 @@ function closeCardUI() {
   const sh = $('#shell'); if (sh) sh.classList.remove('hascard');
   refreshListRowsOnly();
 }
+// lamp in the card header: pin / unpin the open record at once (independent of the Save button; shared by sync)
+function togglePin() {
+  const c = UI.card; if (!c || c.isNew || !c.rec) return;
+  const rec = byUuid().get(c.uuid) || c.rec, on = !rec.pin; updateRecord(rec, { pin: on }); c.rec = rec;
+  const b = $('#cPin'); if (b) { b.classList.toggle('on', on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); b.setAttribute('aria-label', t(on ? 'pin_off' : 'pin_on')); }
+  const h = $('#cardhost'); if (h) h.classList.toggle('pinned', on);
+  refreshListRowsOnly();
+}
 async function closeCard(force) {
   if (!UI.card) return true;
   if (!force && !(await confirmLeaveCard())) return false;
@@ -950,11 +1003,32 @@ function saveCardCore() {
   return true;
 }
 async function saveCard(next) {
+  const wasNew = !!(UI.card && UI.card.isNew);
   if (!saveCardCore()) return false;
+  const newUuid = UI.card.uuid;
   const pre = (UI.card.rec && UI.card.rec.type) || UI.card.preset || '';
   const l = UI.card.layer; closeCardUI(); if (l) await dropLayer(l);
   if (next) openCard(null, undefined, false, pre);
+  else if (wasNew) revealRecord(newUuid);
   return true;
+}
+// bring list row i into view (centred when `centre` and it was off-screen); the virtual list re-renders itself on scroll
+function scrollToIndex(i, centre) {
+  const tw = $('#tw'), rows = $('#rows'); if (!tw || !rows) return;
+  const rh = UI.vr.rh, rowsTop = rows.getBoundingClientRect().top - tw.getBoundingClientRect().top + tw.scrollTop, vh = tw.clientHeight;
+  const hh = ($('#th') || {}).offsetHeight || 0, y = rowsTop + i * rh;
+  if (y < tw.scrollTop + hh) tw.scrollTop = Math.max(0, centre ? y - Math.max(0, (vh - rh) / 2) : y - hh);
+  else if (y + rh > tw.scrollTop + vh) tw.scrollTop = centre ? y - Math.max(0, (vh - rh) / 2) : y + rh - vh;
+  renderWindow(true);
+}
+// after a new record is saved: scroll the list to it and flash its row (the order is the chosen sort; ID never changes)
+function revealRecord(uuid) {
+  const tw = $('#tw'); if (!tw || UI.route !== 'books') return;
+  let l = computeList(), i = l.findIndex(r => r.uuid === uuid);
+  if (i < 0) { UI.q = ''; UI.filter = 'all'; UI.colf = {}; const q = $('#q'); if (q) q.value = ''; renderChips(); refreshList(); l = UI.list; i = l.findIndex(r => r.uuid === uuid); if (i < 0) return; }
+  const v = UI.vr; scrollToIndex(i, true);
+  UI.hlU = uuid; v.from = -1; renderWindow(true);
+  setTimeout(() => { if (UI.hlU === uuid) { UI.hlU = null; v.from = -1; renderWindow(true); } }, 2300);
 }
 
 async function doLock() {
@@ -963,5 +1037,6 @@ async function doLock() {
   else DB.draft = null;
   await Auth.lockNow();
   UI.card = null; UI.sel.clear(); UI.selMode = false; UI.route = 'books'; UI.q = ''; UI.filter = 'all'; UI.listKey = ''; UI.layers = [];
+  document.querySelectorAll('.mb').forEach(e => e.remove());
   showLock();
 }

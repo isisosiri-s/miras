@@ -1,5 +1,5 @@
 'use strict';
-/* Miras UI part 2: trash, columns, settings, import/export, Excel import, sync */
+/* Gazna UI part 2: trash, columns, settings, import/export, Excel import, sync */
 
 function pageShell(main, title, inner, right) {
   main.innerHTML = `${mobBar(title, true)}<div class="pageh"><h2>${esc(title)}</h2>${right || ''}</div><div class="page"><div class="pagein" id="pg">${inner}</div></div>`;
@@ -301,7 +301,7 @@ function viewImport(main) {
 
 // ---------- sync ----------
 // ---------- Wi-Fi block ----------
-const lanClientOk = () => !window.MirasLan && (deviceKind() === 'phone' || window.__lanTest);
+const lanClientOk = () => !window.GaznaLan && (deviceKind() === 'phone' || window.__lanTest);
 function lanStatsHtml(st) {
   if (!st) return '';
   const parts = [t('lan_res', { a: st.added, c: st.changed + st.merged, d: st.deleted })];
@@ -309,7 +309,7 @@ function lanStatsHtml(st) {
   return `<div class="hint" style="text-align:center">${parts.map(esc).join('<br>')}</div>`;
 }
 function lanBlockHtml() {
-  if (window.MirasLan) {
+  if (window.GaznaLan) {
     if (!LAN.on) return `<div class="sect">${t('lan_title')}</div><div class="hint">${t('lan_pc_hint')}</div><div style="padding:6px 12px"><button class="btn b1" id="lnStart" style="width:100%">${t('lan_wait_btn')}</button>${LAN.last ? lanStatsHtml(LAN.last) : ''}</div>`;
     return `<div class="sect">${t('lan_title')}</div><div class="group lan" style="padding:12px">
       <div class="ss">${t('lan_urls')}</div>${LAN.urls.length ? LAN.urls.map(u => `<div class="lan-url">${esc(u.replace(/^http:\/\//, ''))}</div>`).join('') : `<div class="lan-url">–</div>`}
@@ -320,7 +320,7 @@ function lanBlockHtml() {
   if (!lanClientOk()) return '';
   return `<div class="sect">${t('lan_title')}</div><div class="hint">${t('lan_phone_hint')}</div><div style="padding:0 12px 6px">
     <div class="lbl">${t('lan_addr')}</div><input class="inp" id="lnAddr" inputmode="url" autocomplete="off" placeholder="192.168.1.5:${LAN_PORT}" value="${esc(H.lanAddr || '')}">
-    <div class="lbl" style="margin-top:8px">${t('lan_code')}</div><input class="inp" id="lnCode" inputmode="numeric" autocomplete="off" maxlength="11" placeholder="000 000 000">
+    <div class="lbl" style="margin-top:8px">${t('lan_code')}</div><input id="lnCode" class="inp lan-in" inputmode="numeric" autocomplete="off" maxlength="11" placeholder="000 000 000">
     <button class="btn b1" id="lnGo" style="width:100%;margin-top:10px">${t('lan_go')}</button></div>`;
 }
 function bindLan(main) {
@@ -328,6 +328,8 @@ function bindLan(main) {
   const errToast = e => toast(t({ code: 'lan_err_code', locked: 'lan_err_locked', wait: 'lan_err_wait', port: 'lan_err_port' }[e && e.message] || 'lan_err_net'), 4500);
   if (st) st.onclick = async () => { try { await lanStartPc(); } catch (e) { errToast(e); } viewSync(main); };
   if (sp) sp.onclick = async () => { await lanStopPc(); viewSync(main); };
+  const lc = $('#lnCode');
+  if (lc) lc.addEventListener('input', () => { const d = lc.value.replace(/\D/g, '').slice(0, 9); lc.value = d.replace(/(\d{3})(?=\d)/g, '$1 '); });
   if (go) go.onclick = async () => {
     const addr = $('#lnAddr').value.trim(), code = $('#lnCode').value.replace(/\s+/g, '');
     if (!addr) { $('#lnAddr').focus(); return; }

@@ -28,7 +28,7 @@ svg{display:block}
 .lockscr{height:100%;overflow:auto;background:linear-gradient(170deg,#4A2D17,#241208);color:#F3E9D6;display:flex;flex-direction:column;align-items:center;justify-content:safe center;padding:24px}
 .lockscr>:first-child{margin-top:auto}.lockscr>:last-child{margin-bottom:auto}
 .lockbox{width:min(100%,360px);display:flex;flex-direction:column;gap:12px}
-.lockbox h1{margin:10px 0 0;text-align:center;font-size:1.9rem;color:#fff}
+.lockbox h1{margin:10px 0 14px;text-align:center;font-size:1.9rem;color:#fff}
 .lockbox .sub{text-align:center;color:#CDBB9D;font-size:.85rem;margin-bottom:8px}
 .lockbox input{height:3rem;border-radius:10px;border:1px solid #7A5A3A;background:#3A2414;color:#fff;padding:0 14px;font-size:1rem;width:100%}
 .lockbox input::placeholder{color:#a8957a}
@@ -79,7 +79,7 @@ svg{display:block}
 .selbar .sb.del{background:#B3261E;margin-left:auto}
 /* table */
 .tablewrap{flex:1;min-height:0;overflow:auto;background:var(--surface);border-top:1px solid var(--border);-webkit-overflow-scrolling:touch}
-.th,.tr{display:grid;grid-template-columns:var(--tpl);align-items:stretch;column-gap:0;padding:0;min-width:100%;width:max-content}
+.th,.tr{display:grid;grid-template-columns:var(--tpl) var(--spare,0px);align-items:stretch;column-gap:0;padding:0;min-width:100%;width:max-content}
 .th>span,.tr>span{box-sizing:border-box;min-width:0;padding:0 8px;border-right:1px solid var(--border);display:flex;align-items:center;overflow:hidden}
 .th>span,.th>span.stk{position:relative}.th>span.stk,.tr>span.stk{position:sticky}
 .stk{z-index:2;background:inherit}.th .stk{z-index:4}
@@ -180,9 +180,26 @@ select.inp{appearance:auto}
   .side .sp{flex:1}
   .side .lg{display:flex;background:rgba(255,255,255,.08);border-radius:10px;padding:3px;gap:3px;margin:10px 0}
   .side .lg button{flex:1;height:32px;border-radius:8px;font-size:.78rem;font-weight:600;color:var(--side-text)}.side .lg button.on{background:var(--accent);color:#fff}
-  .shell{grid-template-columns:240px minmax(0,1fr)}
-  .shell.hascard{grid-template-columns:240px minmax(0,1fr) 400px}
-  #cardhost{position:static;inset:auto;z-index:auto;grid-column:3;grid-row:1;border-left:1px solid var(--border);padding:0;width:400px}
+  .shell{grid-template-columns:var(--sw,240px) minmax(0,1fr);overflow:hidden}
+  .shell.side-narrow{--sw:56px}.shell.side-hidden{--sw:0px}
+  /* the card slides over the list from the right: nothing underneath moves; the table gets a 400px spare so hidden columns can be scrolled into view */
+  #cardhost{position:absolute;inset:0 0 0 auto;z-index:20;width:400px;border-left:1px solid var(--border);box-shadow:-10px 0 30px rgba(43,33,24,.35);padding:0}
+  .shell.hascard #tw{--spare:400px}
+  /* sidebar: full / narrow (icons only) / hidden; the burger button sits at the top-left corner */
+  .side{padding-top:52px}
+  .shell.side-hidden>.side{visibility:hidden;overflow:hidden;padding:0;width:0}
+  html .shell.side-narrow>.side{padding:52px 4px 12px}
+  html .shell.side-hidden>.side{padding:0}
+  .shell.side-narrow .brand{justify-content:center;padding:4px 0 14px}
+  .shell.side-narrow .brand svg{width:32px;height:32px}
+  .shell.side-narrow .brand>div,.shell.side-narrow .nav span,.shell.side-narrow .side .lg{display:none}
+  .shell.side-narrow .nav{justify-content:center;padding:0}
+  .sidebtn{position:absolute;left:8px;top:8px;z-index:30;width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--side-text)}
+  .sidebtn:hover{background:rgba(255,255,255,.1)}
+  .shell.side-hidden .sidebtn{color:var(--text)}.shell.side-hidden .sidebtn:hover{background:var(--row-hl)}
+  .shell.side-hidden #main>.toolbar{padding-left:58px}
+  .shell.side-hidden #main .pageh{padding-left:58px}
+  .shell>.side{animation:fadeIn .16s ease both}
   .fab{display:none}
   .pageh{display:flex}
   .only-narrow{display:none!important}
@@ -268,7 +285,7 @@ select.inp{appearance:auto}
 .srail{position:absolute;right:0;width:28px;display:none;touch-action:none;z-index:6}
 .sthumb{position:absolute;right:3px;top:0;width:7px;border-radius:4px;background:var(--accent);opacity:.5;transition:width .12s,opacity .12s}
 .srail.on .sthumb{width:14px;opacity:.95}
-@media (orientation:landscape) and (max-height:520px){
+@media (max-height:520px){
   /* phone in landscape: compact top block that folds away smoothly while scrolling */
   .main>.appbar.mob,.main>.toolbar{overflow:hidden}
   .main>.appbar.mob{height:auto;min-height:0;max-height:44px}
@@ -326,7 +343,7 @@ select.inp{appearance:auto}
 .rp-found{font-size:.78rem;margin-top:3px;min-height:1em}.rp-found.ok{color:var(--ok)}.rp-found.bad{color:var(--bad,#B3261E)}
 .modal .seg{margin:0;flex:none}
 .rp-s{color:var(--muted)!important}
-@media (orientation:landscape) and (max-height:520px){
+@media (max-height:520px){
   .rp-cards{padding:6px 12px 4px}.rp-c{padding:5px 8px}.rp-c .v{font-size:1.05rem}
   .rp-tot{margin-bottom:6px;padding:5px 10px}.rp-tools .btn{height:36px}
   .rp-item{padding:8px 10px;margin-bottom:6px}
@@ -348,6 +365,7 @@ select.inp{appearance:auto}
 
 /* 1.1.27 Wi-Fi sync */
 .lan-url{font-weight:700;font-size:1.05rem;word-break:break-all;margin-top:2px}
+.lan-in{font-weight:800;font-size:1.7rem;letter-spacing:.25em;text-align:center;font-variant-numeric:tabular-nums}.lan-in::placeholder{font-weight:600;opacity:.4}
 .lan-code{font-weight:800;font-size:2rem;letter-spacing:.35em;font-variant-numeric:tabular-nums}
 
 /* 1.1.27 it is an app, not a web page: no text selection, except where typing or copying makes sense */
@@ -410,7 +428,7 @@ html.lite #rows.listin .tr,html.lite .routefwd,html.lite .routeback{animation-du
 .langrow button{min-height:32px}
 .chip,.selbar .sb,.lchip,.banner .sbtn,.counter .jmp,.langrow button,.acts button{position:relative}
 .chip::before,.selbar .sb::before,.lchip::before,.banner .sbtn::before,.counter .jmp::before,.langrow button::before,.acts button::before{content:'';position:absolute;left:50%;top:50%;width:max(100%,48px);height:max(100%,48px);transform:translate(-50%,-50%)}
-@media (orientation:landscape) and (max-height:520px){ /* phone in landscape keeps its compact header */
+@media (max-height:520px){ /* phone in landscape keeps its compact header */
   .th{height:32px}.selbar .sb{height:30px}.rp-tools .btn{height:36px}
 }
 /* -- control borders 3:1 (inputs, switches, empty circles) -- */
@@ -504,8 +522,6 @@ html.pc .btn:disabled:hover{box-shadow:none}
 /* -- keyboard focus: Windows focus rectangle, only for keyboard (not mouse clicks) -- */
 html.pc :focus{outline:none}
 html.pc :focus-visible{outline:2px solid var(--text);outline-offset:1px}
-html.pc .inp:focus,html.pc .search input:focus{border-color:var(--outline);box-shadow:inset 0 -2px 0 var(--accent);outline:none}
-html.pc .inp.err:focus{box-shadow:inset 0 -2px 0 var(--bad)}
 /* -- dialogs: always centred (Windows ContentDialog), title 20px, 24px padding -- */
 html.pc .mb{align-items:center;padding:24px}
 html.pc .modal{border-radius:8px;max-width:480px;padding:24px;gap:12px;box-shadow:var(--shadow);animation:dlgIn .18s cubic-bezier(.2,.8,.2,1) both}
@@ -515,7 +531,7 @@ html.pc .modal p{font-size:1rem}
 html.pc .modal .btns{margin-top:12px;gap:8px}
 html.pc .modal .btns.stack .btn{min-height:32px;padding:6px 14px}
 /* -- NavigationView-like pane: 40px items, subtle selected fill + accent indicator bar -- */
-html.pc .side{padding:12px 6px}
+html.pc .side{padding:52px 6px 12px}
 html.pc .brand{padding:4px 10px 16px}
 html.pc .nav{height:40px;border-radius:4px;font-size:1rem;position:relative;padding:0 12px;gap:14px}
 html.pc .nav svg{width:18px;height:18px}
@@ -528,14 +544,6 @@ html.pc .pageh{padding:18px 20px 6px}html.pc .pageh h2{font-size:1.72rem;font-we
 /* details pane header */
 html.pc .cardhead{height:44px}html.pc .cardhead h3{font-size:1.07rem}
 /* compact pane (icons only) when the details card is open in a narrower window */
-@media (max-width:1279px){
-  html.pc .shell.hascard{grid-template-columns:52px minmax(0,1fr) 380px}
-  html.pc .shell.hascard #cardhost{width:380px}
-  html.pc .shell.hascard .side{padding:12px 4px}
-  html.pc .shell.hascard .brand{justify-content:center;padding:4px 0 14px}
-  html.pc .shell.hascard .brand svg{width:32px;height:32px}
-  html.pc .shell.hascard .brand>div,html.pc .shell.hascard .nav span,html.pc .shell.hascard .side .lg{display:none}
-  html.pc .shell.hascard .nav{justify-content:center;padding:0}
 }
 /* PC dialogs: Windows corners/padding also for the centred confirmations (beats .mb.center .modal) */
 html.pc .mb.center .modal,html.pc .mb .modal{border-radius:8px;max-width:480px;padding:24px}
@@ -556,3 +564,67 @@ html.pc .combo-list{border-radius:6px}
 html.pc .combo-it{cursor:default;font-size:1rem;padding:0 12px}
 html.pc .combo-it:hover{background:var(--row-hl)}
 .cardbody.combo-room{padding-bottom:70vh}
+
+/* ---- amber focus frame: the same on phone, tablet and PC, light and dark theme ---- */
+:root{--ring:#E0A21A;--ringa:rgba(224,162,26,.32)}
+:root[data-theme=dark]{--ring:#F2B544;--ringa:rgba(242,181,68,.30)}
+html .inp:focus,html .search input:focus,html .lockbox input:focus,html .fcol select:focus,html .dd-btn:focus-visible,html .dd.open .dd-btn,html .scanrow:focus-visible{outline:none;border-color:var(--ring);box-shadow:0 0 0 1px var(--ring),0 0 0 4px var(--ringa)}
+html .inp.err:focus{border-color:var(--bad);box-shadow:0 0 0 1px var(--bad),0 0 0 4px rgba(200,60,40,.25)}
+html .inp.ro:focus{box-shadow:none;border-color:var(--outline)}
+
+/* ---- own dropdowns (ui5.js): replace the system list of every <select> ---- */
+.dd{position:relative;min-width:0}
+.dd-native{position:absolute!important;left:0;top:0;width:100%;height:100%;opacity:0;pointer-events:none}
+.dd-btn{display:flex;align-items:center;justify-content:space-between;gap:8px;text-align:left;cursor:pointer;width:100%;min-height:34px;padding:0 12px;background:var(--surface);color:var(--text);border:1px solid var(--outline);border-radius:10px;font-size:inherit}
+.dd-btn.inp{padding:0 12px;appearance:none;-webkit-appearance:none}
+.dd-btn:disabled{opacity:.55;cursor:default}
+.dd-t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dd-btn.dd-empty .dd-t{color:var(--muted)}
+.dd-ch{flex:none;opacity:.7;transition:transform .16s}
+.dd.open .dd-ch{transform:rotate(180deg)}
+.dd-list{position:absolute;left:0;top:100%;margin-top:4px;min-width:100%;width:max-content;max-width:min(340px,86vw);z-index:40;background:var(--surface);border:1px solid var(--outline);border-radius:10px;box-shadow:var(--shadow);overflow-y:auto;overscroll-behavior:contain;animation:ddIn .12s ease-out}
+.dd-list.up{top:auto;bottom:100%;margin:0 0 4px}
+@keyframes ddIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+.dd-it{display:flex;align-items:center;min-height:38px;padding:0 14px;color:var(--text);border-bottom:1px solid var(--surface2);cursor:default;white-space:nowrap}
+.dd-it:last-child{border-bottom:0}
+.dd-it.on{box-shadow:inset 3px 0 0 var(--accent);font-weight:600}
+.dd-it.hi{background:var(--row-hl)}
+html.pc .dd-list{border-radius:6px}html.pc .dd-btn{border-radius:4px}
+.dd-sheet{display:flex;flex-direction:column;margin:4px -6px 0}
+.dd-row{display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;min-height:56px;padding:0 16px;font-size:1.05rem;text-align:left;background:transparent;color:var(--text);border:0;border-bottom:1px solid var(--surface2)}
+.dd-row:last-child{border-bottom:0}
+.dd-row:active{background:var(--row-hl)}
+.dd-row.on{background:var(--row-hl);box-shadow:inset 4px 0 0 var(--accent);font-weight:700}
+.dd-row.on svg{color:var(--accent)}
+
+/* "In reports" block of the card */
+.inrep{margin:14px 0 8px;padding:12px 14px;border-radius:12px;background:var(--row-hl);border:1px solid var(--outline);flex:1 1 100%;width:100%}
+.inrep-h{font-size:.72rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+.inrep-c{display:flex;flex-wrap:wrap;gap:8px}
+.inrep-chip{padding:7px 12px;min-height:34px;border-radius:999px;background:var(--surface);border:1px solid var(--outline);color:var(--text);font-weight:600;font-size:.9rem}
+.inrep-chip:active{background:var(--row-sel)}
+html.pc .inrep-chip:hover{background:var(--row-sel)}
+
+.th span.srt i{color:var(--accent);font-weight:800}
+#rows .tr.hl{animation:rphl 2.2s ease-out}
+
+/* ---- pinned records: warm "incandescent lamp" glow, same on every cell, stripe on the left ---- */
+#rows .tr.pin{position:relative;z-index:1;box-shadow:0 0 12px 2px rgba(255,185,60,.45)}
+#rows .tr.pin>span,#rows .tr.pin>span.stk{background:#FFEFC2;box-shadow:inset 0 9px 12px -9px rgba(255,170,40,.95),inset 0 -9px 12px -9px rgba(255,170,40,.95)}
+#rows .tr.pin>span:first-child{box-shadow:inset 5px 0 0 #F2A81D,inset 0 9px 12px -9px rgba(255,170,40,.95),inset 0 -9px 12px -9px rgba(255,170,40,.95)}
+#rows .tr.pin.sel>span,#rows .tr.pin.cur>span{background:#FFE29A}
+html.pc #rows .tr.pin:hover>span{background:#FFE8AD}
+:root[data-theme=dark] #rows .tr.pin>span,:root[data-theme=dark] #rows .tr.pin>span.stk{background:#4A3918;box-shadow:inset 0 9px 12px -9px rgba(255,170,40,.6),inset 0 -9px 12px -9px rgba(255,170,40,.6)}
+:root[data-theme=dark] #rows .tr.pin>span:first-child{box-shadow:inset 5px 0 0 #F2A81D,inset 0 9px 12px -9px rgba(255,170,40,.6),inset 0 -9px 12px -9px rgba(255,170,40,.6)}
+:root[data-theme=dark] #rows .tr.pin.sel>span,:root[data-theme=dark] #rows .tr.pin.cur>span{background:#5A4520}
+.cardhead .lamp{color:var(--bar-text);opacity:.75}
+.cardhead .lamp.on{color:#FFC13B;opacity:1}
+.cardhead .lamp.on .lampsvg{fill:#FFC13B;filter:drop-shadow(0 0 5px rgba(255,193,59,.9))}
+#cardhost.pinned .cardbody{background:#FFFBEA;box-shadow:inset 0 0 40px 6px rgba(255,185,60,.5)}
+:root[data-theme=dark] #cardhost.pinned .cardbody{background:#2E2410;box-shadow:inset 0 0 40px 6px rgba(255,185,60,.28)}
+
+.sidemenu{position:fixed;z-index:60;min-width:210px;background:var(--surface);border:1px solid var(--outline);border-radius:8px;box-shadow:var(--shadow);padding:4px;animation:ddIn .12s ease-out}
+.sidemenu button{display:flex;align-items:center;gap:10px;width:100%;height:36px;padding:0 10px;border-radius:6px;text-align:left;color:var(--text)}
+.sidemenu button:hover,.sidemenu button.hi{background:var(--row-hl)}
+.sidemenu button .ck{width:18px;color:var(--accent);flex:none}
+.sidebtn{display:none}@media (min-width:900px){.sidebtn{display:flex}}

@@ -1,14 +1,14 @@
 'use strict';
 // ---- startup log: written FIRST so a silent failure on an old Windows can be diagnosed ----
 const os = require('os');
-// log lives in the program's data folder (%APPDATA%/Miras) next to the database, not on the desktop; the old places are only fallbacks
-const LOG_DIRS = [process.env.APPDATA && require('path').join(process.env.APPDATA, 'Miras'), process.env.PORTABLE_EXECUTABLE_DIR, os.tmpdir()].filter(Boolean);
+// log lives in the program's data folder (%APPDATA%/Gazna) next to the database, not on the desktop; the old places are only fallbacks
+const LOG_DIRS = [process.env.APPDATA && require('path').join(process.env.APPDATA, 'Gazna'), process.env.PORTABLE_EXECUTABLE_DIR, os.tmpdir()].filter(Boolean);
 function log(...a) {
   const fs = require('fs'), line = new Date().toISOString() + ' ' + a.map(x => (x && x.stack) || (typeof x === 'object' ? JSON.stringify(x) : String(x))).join(' ') + '\n';
   for (const d of LOG_DIRS) {
     try {
       fs.mkdirSync(d, { recursive: true });
-      const f = require('path').join(d, 'miras-log.txt');
+      const f = require('path').join(d, 'gazna-log.txt');
       try { if (fs.statSync(f).size > 200 * 1024) fs.renameSync(f, f + '.old'); } catch (_) { /* no log yet */ }
       fs.appendFileSync(f, line); return;
     } catch (_) { /* next dir */ }
@@ -16,18 +16,18 @@ function log(...a) {
 }
 process.on('uncaughtException', e => { log('uncaughtException', e); });
 process.on('unhandledRejection', e => { log('unhandledRejection', e); });
-log('--- start', 'miras electron', process.versions.electron, 'chrome', process.versions.chrome, 'node', process.versions.node, '| win', os.release(), process.arch, '| argv', process.argv.join(' '));
+log('--- start', 'gazna electron', process.versions.electron, 'chrome', process.versions.chrome, 'node', process.versions.node, '| win', os.release(), process.arch, '| argv', process.argv.join(' '));
 const { app, BrowserWindow, ipcMain, dialog, Menu, screen } = require('electron');
 const path = require('path'), fs = require('fs');
 
-// Database lives in ONE file next to user data: %APPDATA%/Miras/miras-db.json
+// Database lives in ONE file next to user data: %APPDATA%/Gazna/gazna-db.json
 // Safety net: a daily backup (last 3 kept) and, if the file is ever unreadable, it is moved aside (never overwritten)
 // and the newest good backup is restored.
-const dbFile = () => path.join(app.getPath('userData'), 'miras-db.json');
+const dbFile = () => path.join(app.getPath('userData'), 'gazna-db.json');
 const BACKUPS_KEEP = 3;
 let store = null, writing = Promise.resolve(), backupDay = '', notice = null;
-const dayStr = () => process.env.MIRAS_TEST_DAY || new Date().toISOString().slice(0, 10).replace(/-/g, '');
-const listBackups = () => { try { return fs.readdirSync(app.getPath('userData')).filter(n => /^miras-db\.bak-\d{8}\.json$/.test(n)).sort().reverse(); } catch { return []; } };
+const dayStr = () => process.env.GAZNA_TEST_DAY || new Date().toISOString().slice(0, 10).replace(/-/g, '');
+const listBackups = () => { try { return fs.readdirSync(app.getPath('userData')).filter(n => /^gazna-db\.bak-\d{8}\.json$/.test(n)).sort().reverse(); } catch { return []; } };
 function load() {
   if (store) return store;
   const f = dbFile();
@@ -35,7 +35,7 @@ function load() {
   if (missing) { store = {}; return store; } // first run
   if (raw === null) raw = '';
   try { store = JSON.parse(raw); if (!store || typeof store !== 'object') throw new Error('bad'); return store; } catch { /* unreadable: handled below */ }
-  const bad = path.join(app.getPath('userData'), 'miras-db.corrupt-' + new Date().toISOString().replace(/[:.]/g, '-') + '.json');
+  const bad = path.join(app.getPath('userData'), 'gazna-db.corrupt-' + new Date().toISOString().replace(/[:.]/g, '-') + '.json');
   try { fs.renameSync(f, bad); } catch { /* ignore */ }
   store = {}; notice = { bad, from: null };
   for (const n of listBackups()) {
@@ -51,14 +51,14 @@ function showNotice() {
   const msg = n.from
     ? `База данных была повреждена и восстановлена из резервной копии от ${d}. Правки после этой даты могли не сохраниться.\n\nMaglumat bazasy zeperlenipdi we ${d} senesindäki nusgadan dikeldildi. Şondan soňky üýtgeşmeler ýitip bilerdi.\n\nThe database was damaged and restored from the backup of ${d}. Changes after that date may be lost.\n\n${n.bad}`
     : `База данных повреждена, резервной копии нет. Приложение запущено с пустой базой. Восстановите данные из копии (Импорт и экспорт) или синхронизацией.\n\nMaglumat bazasy zeperlenipdi, nusga ýok. Programma boş baza bilen açyldy. Maglumatlary nusgadan (Import we eksport) ýa-da sinhronlaşdyrma arkaly dikeldiň.\n\nThe database is damaged and there is no backup; starting empty. Restore from a backup (Import and export) or by syncing.\n\n${n.bad}`;
-  dialog.showMessageBox(win || undefined, { type: n.from ? 'warning' : 'error', title: 'Miras', message: msg }).catch(() => {});
+  dialog.showMessageBox(win || undefined, { type: n.from ? 'warning' : 'error', title: 'Gazna', message: msg }).catch(() => {});
 }
 function dailyBackup() {
   const day = dayStr(); if (backupDay === day) return; backupDay = day;
   const f = dbFile(), dir = app.getPath('userData');
   try {
     if (!fs.existsSync(f)) return;
-    fs.copyFileSync(f, path.join(dir, `miras-db.bak-${day}.json`));
+    fs.copyFileSync(f, path.join(dir, `gazna-db.bak-${day}.json`));
     for (const n of listBackups().slice(BACKUPS_KEEP)) { try { fs.unlinkSync(path.join(dir, n)); } catch { /* ignore */ } }
   } catch (e) { console.error(e); }
 }
@@ -111,8 +111,8 @@ ipcMain.handle('lan:stop', () => { if (lanSrv) { lanSrv.stop('user'); lanSrv = n
 function createWindow() {
   const wa = screen.getPrimaryDisplay().workAreaSize;
   const win = new BrowserWindow({
-    width: Math.min(1280, wa.width), height: Math.min(820, wa.height), minWidth: Math.min(960, wa.width), minHeight: Math.min(600, wa.height),
-    backgroundColor: '#F6F1E9', title: 'Miras', icon: path.join(__dirname, '../www/icon-512.png'),
+    width: Math.min(1280, wa.width), height: Math.min(820, wa.height), minWidth: Math.min(420, wa.width), minHeight: Math.min(600, wa.height),
+    backgroundColor: '#F6F1E9', title: 'Gazna', icon: path.join(__dirname, '../www/icon-512.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: false, nodeIntegration: false, sandbox: false, // only local trusted files are loaded

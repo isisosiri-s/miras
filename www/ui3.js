@@ -1,5 +1,5 @@
 'use strict';
-/* Miras — statistics screen, in-table cell editing (PC), hotkeys (PC) */
+/* Gazna — statistics screen, in-table cell editing (PC), hotkeys (PC) */
 
 // ---------- statistics ----------
 function statsTop(key, n) {
@@ -28,52 +28,26 @@ function viewStats(main) {
   pageShell(main, t('nav_stats'), body);
 }
 
-// ---------- editing cells by double click (wide screens) ----------
-function bindCellEdit() {
-  const rows = $('#rows'); if (!rows || rows._ce) return; rows._ce = 1;
-  rows.addEventListener('dblclick', e => {
-    if (!isWide()) return;
-    const sp = e.target.closest('.tr > span'); const tr = e.target.closest('.tr'); if (!sp || !tr || sp.dataset.cb) return;
-    const r = byUuid().get(tr.dataset.u); if (!r) return;
-    const cols = UI.vr.cols || tableCols(); const off = tr.querySelector('[data-cb]') ? 1 : 0;
-    const c = cols[[...tr.children].indexOf(sp) - off]; if (!c || c.kind === 'id') return;
-    if (c.kind === 'check') { updateRecord(r, { [c.key]: !r[c.key] }); refreshList(); return; }
-    startCellEdit(sp, r, c);
-  });
-}
-function startCellEdit(sp, r, c) {
-  const raw = r[c.key] ?? ''; let el;
-  if (c.kind === 'type' || c.kind === 'list') {
-    const opts = c.kind === 'type' ? [['', t('opt_none')], ['manuscript', t('type_manuscript')], ['printed', t('type_printed')]] : [['', t('opt_none')], ...(c.opts || []).map(o => [o, o])];
-    el = document.createElement('select'); el.innerHTML = opts.map(([v, l]) => `<option value="${esc(v)}" ${raw === v ? 'selected' : ''}>${esc(l)}</option>`).join('');
-  } else { el = document.createElement('input'); el.type = c.kind === 'date' && (raw === '' || isIsoDate(raw)) ? 'date' : 'text'; el.value = c.kind === 'number' && typeof raw === 'number' ? String(raw).replace('.', LANG === 'en' ? '.' : ',') : raw; }
-  el.className = 'inp'; el.style.cssText = 'width:100%;height:100%;box-sizing:border-box;margin:0;padding:2px 6px;font-size:inherit';
-  sp.innerHTML = ''; sp.appendChild(el); el.focus(); if (el.select && el.tagName === 'INPUT') el.select();
-  let done = false;
-  const finish = ok => {
-    if (done) return; done = true;
-    if (ok) {
-      let v = el.value.trim(); if (c.kind === 'number') { if (v === '') v = ''; else { const n = parseNum(v); v = n === null ? v : n; } }
-      if (v !== raw) updateRecord(r, { [c.key]: v });
-    }
-    refreshList();
-  };
-  el.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') { e.preventDefault(); finish(true); } else if (e.key === 'Escape') { e.preventDefault(); finish(false); } });
-  el.addEventListener('blur', () => finish(true));
-  el.addEventListener('click', e => e.stopPropagation());
-  el.addEventListener('dblclick', e => e.stopPropagation());
-}
-
-// ---------- hotkeys (PC) ----------
+// ---------- hotkeys ----------
+// By PHYSICAL key (e.code): they work on any keyboard layout (Russian, Turkmen ...) and at any window width.
 document.addEventListener('keydown', e => {
-  if (!DB.unlocked || !isWide() || document.querySelector('.mb, .lockscr')) return;
-  const typing = /^(INPUT|TEXTAREA|SELECT)$/.test((document.activeElement || {}).tagName || '');
-  const k = e.key.toLowerCase(), ctrl = e.ctrlKey || e.metaKey;
-  if (ctrl && k === 'f') { e.preventDefault(); if (UI.route !== 'books') goRoute('books'); setTimeout(() => { const q = $('#q'); if (q) { q.focus(); q.select(); } }, 30); }
-  else if (ctrl && k === 'n') { e.preventDefault(); addRecord(); }
-  else if (ctrl && k === 's' && UI.card) { e.preventDefault(); saveCard(false); }
-  else if (ctrl && k === 'l') { e.preventDefault(); doLock(); }
-  else if (e.key === 'Escape' && UI.route === 'reports' && UI.rep.sel && !$('.modal') && !typing) { e.preventDefault(); history.back(); }
-  else if (e.key === 'Escape' && UI.card && !typing) { e.preventDefault(); closeCard(false); }
-  else if (k === '/' && !typing && !ctrl) { e.preventDefault(); if (UI.route !== 'books') goRoute('books'); setTimeout(() => { const q = $('#q'); if (q) q.focus(); }, 30); }
+  if (!DB.unlocked || document.querySelector('.lockscr')) return;
+  if (document.querySelector('.mb')) return; // a dialog is open: it owns the keys
+  const ae = document.activeElement || {}, typing = /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName || '');
+  const ctrl = (e.ctrlKey || e.metaKey) && !e.altKey, code = e.code;
+  const inCard = !!(ae.closest && ae.closest('#cardhost'));
+  const toSearch = sel => { if (UI.route !== 'books') goRoute('books'); setTimeout(() => { const q = $('#q'); if (q) { q.focus(); if (sel) q.select(); } }, 30); };
+  if (ctrl && code === 'KeyF') { e.preventDefault(); toSearch(true); }
+  else if (ctrl && code === 'KeyN') { e.preventDefault(); addRecord(); }
+  else if (ctrl && (code === 'KeyS' || code === 'Enter' || code === 'NumpadEnter') && UI.card) { e.preventDefault(); saveCard(false); }
+  else if (ctrl && code === 'KeyL') { e.preventDefault(); doLock(); }
+  else if (ctrl && code === 'KeyD') { e.preventDefault(); if (UI.card && !UI.card.isNew) togglePin(); }
+  else if (ctrl && code === 'KeyB') { e.preventDefault(); if (typeof toggleSide === 'function') toggleSide(); }
+  else if (e.altKey && !ctrl && (code === 'ArrowDown' || code === 'ArrowUp') && UI.card && !UI.card.isNew) {
+    e.preventDefault(); const l = computeList(), i = l.findIndex(r => r.uuid === UI.card.uuid), n = l[i + (code === 'ArrowDown' ? 1 : -1)];
+    if (n) { scrollToIndex(i + (code === 'ArrowDown' ? 1 : -1), false); openCard(n.uuid); }
+  }
+  else if (code === 'Escape' && UI.route === 'reports' && UI.rep.sel && !$('.modal') && !typing) { e.preventDefault(); history.back(); }
+  else if (code === 'Escape' && UI.card && (!typing || inCard)) { e.preventDefault(); closeCard(false); }
+  else if (code === 'Slash' && !e.shiftKey && !typing && !ctrl && !e.altKey) { e.preventDefault(); toSearch(false); }
 });
