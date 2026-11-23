@@ -40,17 +40,23 @@
       if (!isWide()) { openSheet(); return; }
       list = document.createElement('div'); list.className = 'dd-list'; list.setAttribute('role', 'listbox');
       list.innerHTML = opts.map(o => `<div class="dd-it${o.v === cur ? ' on' : ''}" role="option" data-v="${esc(o.v)}">${esc(o.t)}</div>`).join('');
-      wrap.appendChild(list); wrap.classList.add('open'); btn.setAttribute('aria-expanded', 'true');
+      document.body.appendChild(list); wrap.classList.add('open'); btn.setAttribute('aria-expanded', 'true');
       const r = btn.getBoundingClientRect(), need = Math.min(opts.length, 7) * 38 + 8, host = btn.closest('.cardbody') || document.documentElement;
       const room = Math.min(host.getBoundingClientRect().bottom, window.innerHeight) - r.bottom - 8;
       list.classList.toggle('up', room < need && r.top > room);
-      list.style.maxHeight = Math.max(76, Math.min(need, room < need && r.top > room ? r.top - 12 : room)) + 'px';
+      const up = room < need && r.top > room;
+      list.style.maxHeight = Math.max(76, Math.min(need, up ? r.top - 12 : room)) + 'px';
+      // fixed + appended to <body>: a dialog / card with overflow:hidden must not clip the list
+      list.style.position = 'fixed'; list.style.zIndex = '3000'; list.style.margin = '0'; list.style.left = Math.max(4, Math.min(r.left, window.innerWidth - 8 - Math.max(r.width, 180))) + 'px'; list.style.minWidth = r.width + 'px';
+      if (up) { list.style.top = 'auto'; list.style.bottom = (window.innerHeight - r.top + 4) + 'px'; } else { list.style.top = (r.bottom + 4) + 'px'; }
       hi = Math.max(0, opts.findIndex(o => o.v === cur)); paint();
       list.addEventListener('mousedown', e => e.preventDefault());
       list.addEventListener('click', e => { const it = e.target.closest('[data-v]'); if (it) choose(it.dataset.v); });
       list.addEventListener('mousemove', e => { const it = e.target.closest('.dd-it'); if (it) { const i = [...list.children].indexOf(it); if (i !== hi) { hi = i; paint(); } } });
-      const out = e => { if (!document.body.contains(btn)) return close(); if (!wrap.contains(e.target)) close(); };
-      document.addEventListener('pointerdown', out, true); off = () => document.removeEventListener('pointerdown', out, true);
+      const out = e => { if (!document.body.contains(btn)) return close(); if (!wrap.contains(e.target) && !(list && list.contains(e.target))) close(); };
+      const sc = e => { if (list && !list.contains(e.target)) close(); };
+      document.addEventListener('pointerdown', out, true); window.addEventListener('scroll', sc, true); window.addEventListener('resize', close);
+      off = () => { document.removeEventListener('pointerdown', out, true); window.removeEventListener('scroll', sc, true); window.removeEventListener('resize', close); };
     };
     async function openSheet() {
       const cur = vd.get.call(sel), lab = wrap.parentElement && (wrap.parentElement.closest('.fld,.setrow') || wrap.parentElement).querySelector('.lbl,.tt');

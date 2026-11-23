@@ -50,9 +50,11 @@ function startServer(onRequest, onEvent) {
     send(res, 404, 'no');
   });
   let stopped = false;
+  const socks = new Set(); // Electron 22 = Node 16: no closeAllConnections(), so keep-alive sockets are tracked and destroyed on stop
+  server.on('connection', sk => { socks.add(sk); sk.on('close', () => socks.delete(sk)); });
   function stop(why) {
     if (stopped) return; stopped = true; clearTimeout(idle);
-    try { server.close(); server.closeAllConnections && server.closeAllConnections(); } catch (_) { /* ignore */ }
+    try { server.close(); server.closeAllConnections && server.closeAllConnections(); for (const sk of socks) sk.destroy(); } catch (_) { /* ignore */ }
     emit('stopped', { why });
   }
   // first free port from PORT upwards (a busy port is common: second copy, other program)
