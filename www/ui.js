@@ -1035,8 +1035,11 @@ async function doLock() {
   if (!Auth.hasPin()) { await flushSave(); return; }
   if (UI.card && cardDirty()) DB.draft = { uuid: UI.card.uuid, isNew: UI.card.isNew, vals: readCard() };
   else DB.draft = null;
+  // where the person was (screen, search, filters, report folder/month, scroll): kept in memory only and restored after the PIN
+  const tw = $('#tw');
+  UI.lockState = { route: UI.route, q: UI.q, filter: UI.filter, colf: Object.assign({}, UI.colf || {}), rep: UI.rep ? Object.assign({}, UI.rep) : null, scroll: tw ? tw.scrollTop : 0 };
   await Auth.lockNow();
-  UI.card = null; UI.sel.clear(); UI.selMode = false; UI.route = 'books'; UI.q = ''; UI.filter = 'all'; UI.listKey = ''; UI.layers = [];
+  UI.card = null; UI.sel.clear(); UI.selMode = false; UI.route = 'books'; UI.q = ''; UI.filter = 'all'; UI.colf = {}; UI.listKey = ''; UI.layers = []; UI.routeLayer = null;
   document.querySelectorAll('.mb').forEach(e => e.remove());
   showLock();
 }

@@ -15,8 +15,14 @@ if (IS_PC) {
 async function afterUnlock() {
   await Native.setShotBlock(H.shot);
   UI.firstPaint = true; // first list build waits one frame: the app frame appears (and fades in) before the heavy work
+  const ls = UI.lockState; UI.lockState = null; // set by doLock (in memory only): restore the screen the person was on
+  if (ls) { UI.q = ls.q; UI.filter = ls.filter; UI.colf = ls.colf || {}; if (ls.rep) Object.assign(UI.rep, ls.rep); }
   mountShell();
   history.replaceState({ root: 1 }, '');
+  if (ls) {
+    if (ls.route && ls.route !== 'books') { try { goRoute(ls.route); } catch (e) { } }
+    else if (ls.scroll) setTimeout(() => { const tw = $('#tw'); if (tw && ls.scroll) { tw.scrollTop = ls.scroll; if (typeof renderWindow === 'function') renderWindow(); } }, 350);
+  }
   if (DB.draft) { const d = DB.draft; DB.draft = null; scheduleSave(); openCard(d.isNew ? null : d.uuid, d.vals, true); }
 }
 
