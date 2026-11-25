@@ -157,6 +157,7 @@ async function viewSettings(main) {
   <div class="group">${rowSwitch('sRest', t('set_rest'), t('set_rest_sub'), H.rest)}${H.rest ? rowSwitch('sRestUi', t('set_restui'), t('set_restui_sub'), H.restUi) : ''}</div>
   <div class="group">${rowSwitch('sShot', t('set_shot'), Native.canBlockShots() ? t('set_shot_sub') : t('set_shot_na'), H.shot)}</div>
   <div class="group"><div class="setrow col"><div class="tt">${t('set_theme')}</div>${segHtml('sTheme', [['light', t('theme_light')], ['dark', t('theme_dark')]], H.theme)}</div>
+  <div class="setrow col"><div class="tt">${t('anim_title')}</div>${segHtml('sAnim', [['1', t('anim_1')], ['2', t('anim_2')], ['3', t('anim_3')]], animLevel())}</div>
   <div class="setrow col"><div class="tt">${t('set_font')}</div>${segHtml('sFont', [['s', t('font_s')], ['m', t('font_m')], ['l', t('font_l')]], H.font)}</div></div>
   <div class="group">${rowLink('sCols', t('set_columns'))}${rowLink('sTrash', t('set_trash'), trashN ? `${trashN}` : '')}
   <div class="setrow"><div class="tt">${t('set_backup')}<div class="ss">${bk}</div>${Native.cap ? `<div class="ss">${t('backup_warn')}</div>` : ''}</div><button class="sbtn" id="sBk">${t('set_backup_btn')}</button></div>
@@ -164,7 +165,11 @@ async function viewSettings(main) {
   main.querySelector('.page').scrollTop = sc;
   const again = () => viewSettings(main);
   $$('#sLang button', main).forEach(b => b.onclick = async () => { await setLang(b.dataset.v); });
-  $$('#sTheme button', main).forEach(b => b.onclick = async () => { H.theme = b.dataset.v; applyPrefs(); await saveHeader(); again(); });
+  $$('#sTheme button', main).forEach(b => b.onclick = async () => {
+    if (animLevel() >= 2) { const de = document.documentElement; de.classList.add('themefade'); setTimeout(() => de.classList.remove('themefade'), 380); }
+    H.theme = b.dataset.v; applyPrefs(); await saveHeader(); again();
+  });
+  $$('#sAnim button', main).forEach(b => b.onclick = async () => { H.anim = +b.dataset.v; applyPrefs(); await saveHeader(); again(); });
   $$('#sFont button', main).forEach(b => b.onclick = async () => { H.font = b.dataset.v; applyPrefs(); await saveHeader(); again(); });
   $('#sRest').onclick = async () => { H.rest = !H.rest; if (!H.rest && UI.filter.includes('rest')) UI.filter = 'all'; UI.listKey = ''; await saveHeader(); again(); };
   if ($('#sRestUi')) $('#sRestUi').onclick = async () => { H.restUi = !H.restUi; if (!H.restUi && (UI.filter === 'rest' || UI.filter === 'notrest')) UI.filter = 'all'; await saveHeader(); again(); };

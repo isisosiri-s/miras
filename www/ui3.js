@@ -16,7 +16,7 @@ function viewStats(main) {
   const c = counts(); const live = DB.records.filter(isLive);
   const pct = n => c.total ? (n * 100 / c.total).toFixed(1).replace('.', LANG === 'en' ? '.' : ',') + '%' : '–';
   let pages = 0, pn = 0; for (const r of live) { const v = typeof r.pages === 'number' ? r.pages : parseNum(String(r.pages ?? '')); if (typeof v === 'number' && isFinite(v)) { pages += v; pn++; } }
-  const card = (l, v, s, ctr) => `<div style="flex:1 1 140px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:12px 14px${ctr ? ';text-align:center' : ''}"><div class="ss">${esc(l)}</div><div style="font-size:1.5rem;font-weight:700;margin-top:2px">${v}</div>${s ? `<div class="ss">${s}</div>` : ''}</div>`;
+  const card = (l, v, s, ctr) => `<div style="flex:1 1 140px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:12px 14px${ctr ? ';text-align:center' : ''}"><div class="ss">${esc(l)}</div><div class="cu" style="font-size:1.5rem;font-weight:700;margin-top:2px">${v}</div>${s ? `<div class="ss">${s}</div>` : ''}</div>`;
   const row = (...cs) => `<div style="display:flex;gap:10px;margin:10px 12px 0">${cs.join('')}</div>`;
   const types = ['manuscript', 'printed'].map(k => [t('type_' + k), live.filter(r => r.type === k).length]).filter(x => x[1]);
   const noType = live.filter(r => !r.type).length; if (noType) types.push([t('st_notype'), noType]);

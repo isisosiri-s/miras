@@ -332,7 +332,7 @@ async function setLang(l) {
   mountShell(); UI.layers = layers; if (route !== 'books') { UI.route = route; renderRoute(); }
   if (draft) openCard(draft.isNew ? null : draft.uuid, draft.vals, true);
 }
-function animRoute(cls = 'routein') { const m = $('#main'); if (!m) return; m.classList.remove('routein', 'routefwd', 'routeback'); void m.offsetWidth; m.classList.add(cls); }
+function animRoute(cls = 'routein') { const m = $('#main'); if (!m) return; m.classList.remove('routein', 'routefwd', 'routeback'); void m.offsetWidth; m.classList.add(cls); if (animLevel() >= 3) setTimeout(countUpAll, 40); }
 function goRoute(r) {
   if (r === UI.route) return;
   if (r === 'books') { if (UI.routeLayer) { const l = UI.routeLayer; UI.routeLayer = null; dropLayer(l); } UI.route = 'books'; renderRoute(); animRoute(); return; }
@@ -534,6 +534,7 @@ function renderWindow(force) {
   } else rows.innerHTML = list.slice(from, to).map(r => rowHtml(r, v.cols, '')).join('');
   v.from = from; v.to = to; v.list = list; v.shown = v.cols;
 }
+function flipHdr(p) { if (animLevel() < 2) return; p.classList.remove('hdrflip'); void p.offsetWidth; p.classList.add('hdrflip'); }
 const LAND_SHORT = '(max-height:520px),(max-height:660px) and (max-width:899px)';
 function onListScroll() {
   const v = UI.vr; if (v.raf) return;
@@ -547,7 +548,12 @@ function onListScroll() {
         if (dt > 34) { v.slowN = (v.slowN || 0) + 1; if (v.slowN >= 6 && !document.documentElement.classList.contains('slow')) document.documentElement.classList.add('slow'); } else v.slowN = Math.max(0, (v.slowN || 0) - 1);
       }
       v.lastT = now; v.lastTop = tw0.scrollTop; v.slowN = v.slowN || 0;
+      if (animLevel() >= 2) { // the + button steps aside while scrolling down, comes back when scrolling up or after a pause
+        const f = $('.fab'), st = tw0.scrollTop, d = st - (v.fabTop || 0);
+        if (f && Math.abs(d) > 10) { f.classList.toggle('fabhide', d > 0 && st > 160); v.fabTop = st; }
+      }
       clearTimeout(v.idleT); v.idleT = setTimeout(() => { v.lastT = 0; setBuf(0); if ($('#rows')) renderWindow('idle'); }, 140);
+      clearTimeout(v.fabT); v.fabT = setTimeout(() => { const fb = $('.fab'); if (fb) fb.classList.remove('fabhide'); }, 1000);
     }
     v.raf = 0;
     const tw = $('#tw');
@@ -555,8 +561,8 @@ function onListScroll() {
     if (tw && matchMedia(LAND_SHORT).matches) {
       const p = tw.parentElement, hid = p.classList.contains('hdrhide'), st = tw.scrollTop;
       // one layout change per fold/unfold (no per-frame animation of heights); keep the visible rows anchored
-      if (!hid && st > 24) { p.classList.add('hdrhide'); v.from = -1; }
-      else if (hid && st < 4) { p.classList.remove('hdrhide'); v.from = -1; }
+      if (!hid && st > 24) { p.classList.add('hdrhide'); v.from = -1; flipHdr(p); }
+      else if (hid && st < 4) { p.classList.remove('hdrhide'); v.from = -1; flipHdr(p); }
     }
     renderWindow(false); updateRail();
   });
@@ -657,13 +663,13 @@ function refreshList() {
     rows.style.paddingTop = rows.style.paddingBottom = '0px'; v.from = v.to = -1;
     rows.innerHTML = `<div class="empty"><b>${total.total ? t('list_none') : t('list_empty')}</b>${total.total ? '' : t('list_empty_sub').replace('{fab}', '<span class="fabi"><svg viewBox="0 0 24 24" width="14" height="14"><path d="M12 5v14M5 12h14" stroke="#fff" stroke-width="3" stroke-linecap="round"/></svg></span>')}</div>`;
   } else renderWindow(true);
-  { const k = list.length + ':' + (list[0] && list[0].uuid); if (k !== UI._lk) { UI._lk = k; rows.classList.remove('listin'); void rows.offsetWidth; rows.classList.add('listin'); clearTimeout(UI._lkT); UI._lkT = setTimeout(() => rows.classList.remove('listin'), 320); } }
+  { const k = list.length + ':' + (list[0] && list[0].uuid); if (k !== UI._lk) { UI._lk = k; rows.classList.remove('listin'); void rows.offsetWidth; rows.classList.add('listin'); clearTimeout(UI._lkT); UI._lkT = setTimeout(() => rows.classList.remove('listin'), animLevel() >= 3 ? 800 : 320); } }
   renderCounter(list, total); renderBanner(total); renderSelbar(); updateRail();
 }
 function renderCounter(list, total) {
   const c = $('#counter'); if (!c) return;
   const found = (UI.q || UI.filter !== 'all') ? ` · ${t('list_found', { n: `<b>${fmtInt(list.length)}</b>` })}` : '';
-  c.innerHTML = `<span>${t('list_total')}: <b>${fmtInt(total.total)}</b></span><span>· ${t('list_scanned')}: <b>${fmtInt(total.scanned)}</b></span>${H.rest && H.restUi ? `<span>· ${t('list_rest')}: <b>${fmtInt(total.rest)}</b></span>` : ''}${found}<span class="pct">${fmtPct(total.scanned, total.total)}</span>${list.length > 40 ? `<button class="jmp" data-jump="top">${esc(t('go_top'))}</button><button class="jmp" data-jump="end">${esc(t('go_end'))}</button>` : ''}`;
+  c.innerHTML = `<span>${t('list_total')}: <b>${fmtInt(total.total)}</b></span><span>· ${t('list_scanned')}: <b>${fmtInt(total.scanned)}</b></span>${H.rest && H.restUi ? `<span>· ${t('list_rest')}: <b>${fmtInt(total.rest)}</b></span>` : ''}${found}<span class="pct">${fmtPct(total.scanned, total.total)}</span>${list.length > 40 ? `<span class="jmpcol"><button class="jmp" data-jump="top">${esc(t('go_top'))}</button><button class="jmp" data-jump="end">${esc(t('go_end'))}</button></span>` : ''}`;
   $('#prog').style.width = (total.total ? total.scanned / total.total * 100 : 0) + '%';
 }
 function renderBanner(total) {
@@ -976,7 +982,14 @@ async function confirmLeaveCard() {
 }
 function closeCardUI() {
   UI.card = null; UI.cardLayerKeep = null;
-  const host = $('#cardhost'); if (host) { host.classList.remove('on'); host.innerHTML = ''; }
+  const host = $('#cardhost');
+  if (host) {
+    host.classList.remove('on'); if (!host.dataset.swiped) { host.style.animation = ''; host.style.transform = ''; host.style.transition = ''; }
+    if (animLevel() >= 2 && host.firstChild && !host.dataset.swiped) { // slide out; the content is cleared when it is over (unless another card was opened meanwhile)
+      host.classList.add('closing'); clearTimeout(UI._cct);
+      UI._cct = setTimeout(() => { host.classList.remove('closing'); if (!UI.card) host.innerHTML = ''; }, 190);
+    } else { host.classList.remove('closing'); host.innerHTML = ''; }
+  }
   const sh = $('#shell'); if (sh) sh.classList.remove('hascard');
   refreshListRowsOnly();
 }
@@ -986,6 +999,7 @@ function togglePin() {
   const rec = byUuid().get(c.uuid) || c.rec, on = !rec.pin; updateRecord(rec, { pin: on }); c.rec = rec;
   const b = $('#cPin'); if (b) { b.classList.toggle('on', on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); b.setAttribute('aria-label', t(on ? 'pin_off' : 'pin_on')); }
   const h = $('#cardhost'); if (h) h.classList.toggle('pinned', on);
+  if (on && b && animLevel() >= 3) { b.classList.remove('flash'); void b.offsetWidth; b.classList.add('flash'); }
   refreshListRowsOnly();
 }
 async function closeCard(force) {

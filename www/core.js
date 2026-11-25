@@ -176,8 +176,15 @@ function detectLang() {
   const l = (navigator.language || 'ru').slice(0, 2).toLowerCase();
   return ['ru', 'tk', 'en'].includes(l) ? l : 'ru';
 }
+// animation level: 1 minimal, 2 medium (default), 3 maximum. Not set by the person: 1 when the system asks for reduced motion or the device is weak
+function animLevel() {
+  if (H.anim === 1 || H.anim === 2 || H.anim === 3) return H.anim;
+  try { if (matchMedia('(prefers-reduced-motion: reduce)').matches || document.documentElement.classList.contains('lite')) return 1; } catch (_) { /* ignore */ }
+  return 2;
+}
 function applyPrefs() {
   LANG = H.lang;
+  document.documentElement.dataset.anim = String(animLevel());
   document.documentElement.lang = LANG;
   document.documentElement.dataset.theme = H.theme;
   document.documentElement.dataset.font = H.font;

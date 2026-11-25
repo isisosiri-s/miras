@@ -634,3 +634,53 @@ html.slow #rows .tr.pin{box-shadow:none}
 html.slow #rows .tr.pin>span,html.slow #rows .tr.pin>span.stk{box-shadow:none}
 html.slow #rows .tr.pin>span:first-child{box-shadow:inset 5px 0 0 #F2A81D}
 .fabi{color:var(--accent-text);display:inline-flex;align-items:center;justify-content:center;width:1.9em;height:1.9em;border-radius:50%;background:var(--accent);vertical-align:middle;margin:0 .2em;box-shadow:0 2px 5px rgba(0,0,0,.25)}.fabi svg{width:1em;height:1em}
+
+/* ================= animation levels: 1 minimal / 2 medium (default) / 3 maximum ================= */
+/* new at level 2+ */
+.fab{transition:transform .22s cubic-bezier(.2,.8,.2,1),opacity .18s,box-shadow .15s}
+.fab.fabhide{animation:none;transform:translateY(96px) scale(.85);opacity:0;pointer-events:none}
+@keyframes slideDownOut{from{transform:none}to{transform:translateY(100%)}}
+@keyframes slideRightOut{from{opacity:1;transform:none}to{opacity:0;transform:translateX(28px)}}
+#cardhost.closing:not(.on){display:flex;pointer-events:none;animation:slideDownOut .19s cubic-bezier(.4,0,1,1) both}
+@media (min-width:900px){#cardhost.closing:not(.on){animation:slideRightOut .17s ease-in both}}
+.hdrflip>.toolbar,.hdrflip>.counter,.hdrflip>.banner,.hdrflip>.prog,.hdrflip>#banner{animation:fadeIn .22s ease both}
+.prog i{transition:width .55s cubic-bezier(.2,.8,.2,1)}
+html.themefade,html.themefade *,html.themefade *::before,html.themefade *::after{transition:background-color .3s ease,color .3s ease,border-color .3s ease,fill .3s ease,stroke .3s ease!important}
+.dd-list{animation:ddIn .14s cubic-bezier(.2,.8,.2,1) both;transform-origin:top center}
+.dd-list.up{transform-origin:bottom center}
+@keyframes ddIn{from{opacity:0;transform:translateY(-4px) scale(.98)}to{opacity:1;transform:none}}
+/* level 3 only */
+@keyframes rowWave{from{opacity:0;transform:translateY(14px) scale(.985)}to{opacity:1;transform:none}}
+html[data-anim="3"] #rows.listin .tr:nth-child(-n+10){animation:rowWave .42s cubic-bezier(.2,.9,.3,1.1) both}
+html[data-anim="3"] #rows.listin .tr:nth-child(1){animation-delay:0ms}
+html[data-anim="3"] #rows.listin .tr:nth-child(2){animation-delay:30ms}
+html[data-anim="3"] #rows.listin .tr:nth-child(3){animation-delay:60ms}
+html[data-anim="3"] #rows.listin .tr:nth-child(4){animation-delay:90ms}
+html[data-anim="3"] #rows.listin .tr:nth-child(5){animation-delay:120ms}
+html[data-anim="3"] #rows.listin .tr:nth-child(6){animation-delay:150ms}
+html[data-anim="3"] #rows.listin .tr:nth-child(7){animation-delay:180ms}
+html[data-anim="3"] #rows.listin .tr:nth-child(8){animation-delay:210ms}
+html[data-anim="3"] #rows.listin .tr:nth-child(9){animation-delay:240ms}
+html[data-anim="3"] #rows.listin .tr:nth-child(10){animation-delay:270ms}
+@keyframes lampFlash{0%{transform:scale(1)}35%{transform:scale(1.45);filter:drop-shadow(0 0 8px rgba(255,185,60,.9))}100%{transform:scale(1)}}
+.cardhead .lamp.flash{animation:lampFlash .5s cubic-bezier(.2,.9,.3,1.2)}
+html[data-anim="3"] .modal{animation-timing-function:cubic-bezier(.2,.9,.3,1.12)}
+html[data-anim="3"] #cardhost.on{animation-timing-function:cubic-bezier(.2,.9,.3,1.06)}
+html[data-anim="3"] .chip,html[data-anim="3"] .seg button{transition:background-color .22s,color .22s,transform .16s cubic-bezier(.2,.9,.3,1.3)}
+html[data-anim="3"] .chip:active,html[data-anim="3"] .seg button:active{transform:scale(.94)}
+html[data-anim="3"] .toast{animation-timing-function:cubic-bezier(.2,.9,.3,1.2)}
+/* level 1: only a quick fade, no movement; the wrong-PIN shake and the busy spinner are signals, they stay */
+html[data-anim="1"] *,html[data-anim="1"] *::before,html[data-anim="1"] *::after{animation-duration:.01ms!important;animation-delay:0s!important;animation-iteration-count:1!important;transition:none!important}
+html[data-anim="1"] .mb,html[data-anim="1"] .shell,html[data-anim="1"] .toast,html[data-anim="1"] #cardhost.on,html[data-anim="1"] .routein,html[data-anim="1"] .routefwd,html[data-anim="1"] .routeback{animation:fadeIn .1s ease both!important}
+html[data-anim="1"] .shake{animation:shake .38s!important}
+html[data-anim="1"] .spin{animation:spin .8s linear infinite!important}
+
+/* "To start" / "To end" jump buttons: one column, "To end" right under "To start" (phone); the row of counters never wraps because of them */
+.counter .jmpcol{display:contents}
+@media (max-width:899px){
+  .counter{flex-wrap:nowrap;align-items:center;padding-bottom:6px}
+  .counter .jmpcol{display:flex;flex-direction:column;gap:4px;margin-left:8px;flex:none}
+  .counter .jmpcol .jmp{height:30px;display:flex;align-items:center;justify-content:center;padding:0 12px}
+  .counter .jmpcol .jmp::before{width:100%;height:100%}
+  .counter .pct+.jmpcol{margin-left:8px}
+}

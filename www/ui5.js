@@ -101,4 +101,43 @@
     if (n.tagName === 'INPUT' && n.select) n.select();
     setTimeout(() => { n._quiet = false; }, 0);
   });
+
+  // ---- animation level 3: numbers in the statistics / reports count up ----
+  window.countUpAll = function () {
+    if (animLevel() < 3) return;
+    document.querySelectorAll('.rp-c .v, .cu').forEach(el => {
+      const raw = el.textContent.replace(/\s/g, ''); if (!/^\d+$/.test(raw)) return;
+      const to = +raw, orig = el.textContent; if (to < 2 || el._cu === to) return; el._cu = to;
+      const t0 = performance.now(), D = 650;
+      const step = now => { const k = Math.min(1, (now - t0) / D), e = 1 - Math.pow(1 - k, 3); el.textContent = fmtInt(Math.round(to * e)); if (k < 1) requestAnimationFrame(step); else el.textContent = orig; };
+      requestAnimationFrame(step);
+    });
+  };
+
+  // ---- phone: drag the card header down to close it (levels 2 and 3) ----
+  let sw = null;
+  document.addEventListener('touchstart', e => {
+    if (isWide() || animLevel() < 2 || e.touches.length !== 1) return;
+    const hd = e.target.closest && e.target.closest('#cardhost .cardhead'); if (!hd || e.target.closest('button,input,select,textarea')) return;
+    const host = $('#cardhost'); if (!host || !host.classList.contains('on')) return;
+    sw = { y: e.touches[0].clientY, t: performance.now(), host, dy: 0 };
+  }, { passive: true });
+  document.addEventListener('touchmove', e => {
+    if (!sw) return; const dy = e.touches[0].clientY - sw.y; sw.dy = Math.max(0, dy);
+    sw.host.style.transition = 'none'; sw.host.style.animation = 'none'; sw.host.style.transform = 'translateY(' + sw.dy + 'px)';
+  }, { passive: true });
+  const swEnd = async () => {
+    if (!sw) return; const s = sw; sw = null; const h = s.host, v = s.dy / Math.max(1, performance.now() - s.t);
+    h.style.transition = 'transform .2s cubic-bezier(.2,.8,.2,1)';
+    if (s.dy > 110 || (s.dy > 50 && v > 0.6)) {
+      h.style.transform = 'translateY(100%)'; h.dataset.swiped = '1';
+      await new Promise(r => setTimeout(r, 200));
+      const ok = await closeCard(false);
+      delete h.dataset.swiped;
+      if (!ok) { h.style.transition = 'transform .2s'; h.style.transform = ''; setTimeout(() => { h.style.transition = ''; }, 220); } // inline animation:none stays until the card closes (restarting the slide-in would jump)
+      else { h.style.transition = ''; h.style.transform = ''; h.style.animation = ''; }
+    } else { h.style.transform = ''; setTimeout(() => { h.style.transition = ''; }, 220); }
+  };
+  document.addEventListener('touchend', swEnd, { passive: true });
+  document.addEventListener('touchcancel', swEnd, { passive: true });
 })();
