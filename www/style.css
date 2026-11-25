@@ -628,3 +628,9 @@ html.pc #rows .tr.pin:hover>span{background:#FFE8AD}
 .sidemenu button:hover,.sidemenu button.hi{background:var(--row-hl)}
 .sidemenu button .ck{width:18px;color:var(--accent);flex:none}
 .sidebtn{display:none}@media (min-width:900px){.sidebtn{display:flex}}
+
+/* slow device (detected while scrolling): drop the pinned-row glow shadows, keep the colours */
+html.slow #rows .tr.pin{box-shadow:none}
+html.slow #rows .tr.pin>span,html.slow #rows .tr.pin>span.stk{box-shadow:none}
+html.slow #rows .tr.pin>span:first-child{box-shadow:inset 5px 0 0 #F2A81D}
+.fabi{color:var(--accent-text);display:inline-flex;align-items:center;justify-content:center;width:1.9em;height:1.9em;border-radius:50%;background:var(--accent);vertical-align:middle;margin:0 .2em;box-shadow:0 2px 5px rgba(0,0,0,.25)}.fabi svg{width:1em;height:1em}

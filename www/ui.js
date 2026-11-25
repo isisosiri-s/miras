@@ -506,7 +506,9 @@ function bindResize() {
   th.addEventListener('click', e => { if (e.target.closest('.rz')) { e.stopPropagation(); return; } const sp = e.target.closest('#th>span[data-k]'); if (sp) colMenu(sp.dataset.k); });
 }
 // ---- virtualised list: only the rows near the viewport exist in the DOM (fixed row height) ----
-const VBUF = 24, VMARGIN = 8; // rows kept above / below the viewport; the window is rebuilt only when the view gets within VMARGIN rows of its edge
+const VBUF0 = 24, VBUFMAX = 72; // rows kept above / below the viewport (grows with the scroll speed: a fast fling must not outrun the drawn rows); the window is rebuilt only when the view gets within VMARGIN rows of its edge
+let VBUF = VBUF0, VMARGIN = 8;
+function setBuf(rowsPerFrame) { VBUF = Math.max(VBUF0, Math.min(VBUFMAX, VBUF0 + Math.ceil(rowsPerFrame * 6))); VMARGIN = Math.max(8, Math.round(VBUF / 3)); }
 UI.sort = null; UI.colf = {};
 UI.vr = { rh: 66, from: -1, to: -1, cols: null, raf: 0 };
 // row height = font size x --row-em (4.1 on phones: two-line titles, big touch rows; denser on the Windows app)
@@ -517,11 +519,12 @@ function renderWindow(force) {
   const rowsTop = rows.getBoundingClientRect().top - tw.getBoundingClientRect().top + tw.scrollTop;
   const top = Math.max(0, tw.scrollTop - rowsTop), h = tw.clientHeight || 600;
   const vis0 = Math.floor(top / rh), vis1 = Math.min(n, Math.ceil((top + h) / rh));
-  if (!force && v.from >= 0 && (vis0 >= v.from + VMARGIN || v.from === 0) && (vis1 <= v.to - VMARGIN || v.to === n)) return;
+  const mg = force === 'idle' ? Math.max(VMARGIN, VBUF0 - 6) : VMARGIN; // after a fling stops, top the window up on the side that is running low
+  if (force !== true && v.from >= 0 && (vis0 >= v.from + mg || v.from === 0) && (vis1 <= v.to - mg || v.to === n)) return;
   const from = Math.max(0, Math.min(n - 1, vis0 - VBUF)), to = Math.min(n, vis1 + VBUF);
   const of = v.from, ot = v.to;
   rows.style.paddingTop = from * rh + 'px'; rows.style.paddingBottom = (n - to) * rh + 'px';
-  if (!force && of >= 0 && v.list === list && v.cols === v.shown && from < ot && to > of && rows.children.length === ot - of) {
+  if (force !== true && of >= 0 && v.list === list && v.cols === v.shown && from < ot && to > of && rows.children.length === ot - of) {
     // scrolled a little: keep the rows that are still in the window, drop the ones that left, add only the new ones
     const keepFrom = Math.max(of, from), keepTo = Math.min(ot, to);
     for (let i = of; i < keepFrom; i++) rows.removeChild(rows.firstChild);
@@ -534,7 +537,18 @@ function renderWindow(force) {
 const LAND_SHORT = '(max-height:520px)';
 function onListScroll() {
   const v = UI.vr; if (v.raf) return;
-  v.raf = requestAnimationFrame(() => {
+  v.raf = requestAnimationFrame(now => {
+    const tw0 = $('#tw');
+    if (tw0) {
+      const dt = Math.max(1, now - (v.lastT || now - 16)), dy = Math.abs(tw0.scrollTop - (v.lastTop || 0));
+      if (v.lastT && dt < 250) {
+        setBuf((dy / dt) * 16 / (v.rh || 60));
+        // device that cannot keep ~30 fps while scrolling: simplify the glow/shadows (animations stay)
+        if (dt > 34) { v.slowN = (v.slowN || 0) + 1; if (v.slowN >= 6 && !document.documentElement.classList.contains('slow')) document.documentElement.classList.add('slow'); } else v.slowN = Math.max(0, (v.slowN || 0) - 1);
+      }
+      v.lastT = now; v.lastTop = tw0.scrollTop; v.slowN = v.slowN || 0;
+      clearTimeout(v.idleT); v.idleT = setTimeout(() => { v.lastT = 0; setBuf(0); if ($('#rows')) renderWindow('idle'); }, 140);
+    }
     v.raf = 0;
     const tw = $('#tw');
     // phone in landscape: header, search, chips, banner and counter fold away while the list is scrolled
@@ -641,7 +655,7 @@ function refreshList() {
   const v = UI.vr; v.cols = cols; v.rh = rowHeightPx(); tw.style.setProperty('--rh', v.rh + 'px');
   if (!list.length) {
     rows.style.paddingTop = rows.style.paddingBottom = '0px'; v.from = v.to = -1;
-    rows.innerHTML = `<div class="empty"><b>${total.total ? t('list_none') : t('list_empty')}</b>${total.total ? '' : t('list_empty_sub')}</div>`;
+    rows.innerHTML = `<div class="empty"><b>${total.total ? t('list_none') : t('list_empty')}</b>${total.total ? '' : t('list_empty_sub').replace('{fab}', '<span class="fabi"><svg viewBox="0 0 24 24" width="14" height="14"><path d="M12 5v14M5 12h14" stroke="#fff" stroke-width="3" stroke-linecap="round"/></svg></span>')}</div>`;
   } else renderWindow(true);
   { const k = list.length + ':' + (list[0] && list[0].uuid); if (k !== UI._lk) { UI._lk = k; rows.classList.remove('listin'); void rows.offsetWidth; rows.classList.add('listin'); clearTimeout(UI._lkT); UI._lkT = setTimeout(() => rows.classList.remove('listin'), 320); } }
   renderCounter(list, total); renderBanner(total); renderSelbar(); updateRail();
