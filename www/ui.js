@@ -534,7 +534,7 @@ function renderWindow(force) {
   } else rows.innerHTML = list.slice(from, to).map(r => rowHtml(r, v.cols, '')).join('');
   v.from = from; v.to = to; v.list = list; v.shown = v.cols;
 }
-const LAND_SHORT = '(max-height:520px)';
+const LAND_SHORT = '(max-height:520px),(max-height:660px) and (max-width:899px)';
 function onListScroll() {
   const v = UI.vr; if (v.raf) return;
   v.raf = requestAnimationFrame(now => {

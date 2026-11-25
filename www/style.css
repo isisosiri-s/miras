@@ -285,7 +285,7 @@ select.inp{appearance:auto}
 .srail{position:absolute;right:0;width:28px;display:none;touch-action:none;z-index:6}
 .sthumb{position:absolute;right:3px;top:0;width:7px;border-radius:4px;background:var(--accent);opacity:.5;transition:width .12s,opacity .12s}
 .srail.on .sthumb{width:14px;opacity:.95}
-@media (max-height:520px){
+@media (max-height:520px),(max-height:660px) and (max-width:899px){
   /* phone in landscape: compact top block that folds away smoothly while scrolling */
   .main>.appbar.mob,.main>.toolbar{overflow:hidden}
   .main>.appbar.mob{height:auto;min-height:0;max-height:44px}
@@ -343,7 +343,7 @@ select.inp{appearance:auto}
 .rp-found{font-size:.78rem;margin-top:3px;min-height:1em}.rp-found.ok{color:var(--ok)}.rp-found.bad{color:var(--bad,#B3261E)}
 .modal .seg{margin:0;flex:none}
 .rp-s{color:var(--muted)!important}
-@media (max-height:520px){
+@media (max-height:520px),(max-height:660px) and (max-width:899px){
   .rp-cards{padding:6px 12px 4px}.rp-c{padding:5px 8px}.rp-c .v{font-size:1.05rem}
   .rp-tot{margin-bottom:6px;padding:5px 10px}.rp-tools .btn{height:36px}
   .rp-item{padding:8px 10px;margin-bottom:6px}
@@ -428,7 +428,7 @@ html.lite #rows.listin .tr,html.lite .routefwd,html.lite .routeback{animation-du
 .langrow button{min-height:32px}
 .chip,.selbar .sb,.lchip,.banner .sbtn,.counter .jmp,.langrow button,.acts button{position:relative}
 .chip::before,.selbar .sb::before,.lchip::before,.banner .sbtn::before,.counter .jmp::before,.langrow button::before,.acts button::before{content:'';position:absolute;left:50%;top:50%;width:max(100%,48px);height:max(100%,48px);transform:translate(-50%,-50%)}
-@media (max-height:520px){ /* phone in landscape keeps its compact header */
+@media (max-height:520px),(max-height:660px) and (max-width:899px){ /* phone in landscape keeps its compact header */
   .th{height:32px}.selbar .sb{height:30px}.rp-tools .btn{height:36px}
 }
 /* -- control borders 3:1 (inputs, switches, empty circles) -- */
