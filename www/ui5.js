@@ -141,3 +141,21 @@
   document.addEventListener('touchend', swEnd, { passive: true });
   document.addEventListener('touchcancel', swEnd, { passive: true });
 })();
+
+// soft edge fade on horizontally scrolling button rows (.chips, .selbar)
+(function () {
+  const SEL = '.chips,.selbar';
+  const upd = el => {
+    const m = el.scrollWidth - el.clientWidth;
+    el.classList.toggle('fl', m > 2 && el.scrollLeft > 2);
+    el.classList.toggle('fr', m > 2 && el.scrollLeft < m - 2);
+  };
+  let q = 0;
+  const all = () => { q = 0; document.querySelectorAll(SEL).forEach(upd); };
+  const soon = () => { if (!q) q = requestAnimationFrame(all); };
+  document.addEventListener('scroll', e => { const t = e.target; if (t && t.matches && t.matches(SEL)) upd(t); }, true);
+  window.addEventListener('resize', soon);
+  new MutationObserver(soon).observe(document.documentElement, { childList: true, subtree: true });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(soon);
+  soon();
+})();

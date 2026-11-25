@@ -684,3 +684,8 @@ html[data-anim="1"] .spin{animation:spin .8s linear infinite!important}
   .counter .jmpcol .jmp::before{width:100%;height:100%}
   .counter .pct+.jmpcol{margin-left:8px}
 }
+
+/* scrolling button rows: soft fade on the edge that still hides content */
+.chips.fl,.selbar.fl{-webkit-mask-image:linear-gradient(90deg,transparent 0,#000 24px);mask-image:linear-gradient(90deg,transparent 0,#000 24px)}
+.chips.fr,.selbar.fr{-webkit-mask-image:linear-gradient(270deg,transparent 0,#000 24px);mask-image:linear-gradient(270deg,transparent 0,#000 24px)}
+.chips.fl.fr,.selbar.fl.fr{-webkit-mask-image:linear-gradient(90deg,transparent 0,#000 24px,#000 calc(100% - 24px),transparent 100%);mask-image:linear-gradient(90deg,transparent 0,#000 24px,#000 calc(100% - 24px),transparent 100%)}
