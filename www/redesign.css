@@ -174,3 +174,5 @@ html.pc .search input{border-radius:18px}
 }
 @media (max-width:360px){.selact{gap:5px;padding:10px 8px 12px}.selbar .selact .sb{font-size:.64rem;letter-spacing:-.2px}}
 @media (min-width:900px){#bImp,#bExp{display:none!important}}
+@media (max-width:899px){.selbar .selact .sb{font-size:11.5px}}
+@media (max-width:360px){.selbar .selact .sb{font-size:10.5px}}
