@@ -564,7 +564,12 @@ function onListScroll() {
         if (dt > 34) { v.slowN = (v.slowN || 0) + 1; if (v.slowN >= 6 && !document.documentElement.classList.contains('slow')) document.documentElement.classList.add('slow'); } else v.slowN = Math.max(0, (v.slowN || 0) - 1);
       }
       v.lastT = now; v.lastTop = tw0.scrollTop; v.slowN = v.slowN || 0;
+      if (animLevel() >= 2) { // the + button steps aside while scrolling down, comes back when scrolling up or after a pause
+        const f = $('.fab'), st = tw0.scrollTop, d = st - (v.fabTop || 0);
+        if (f && Math.abs(d) > 10) { f.classList.toggle('fabhide', d > 0 && st > 160); v.fabTop = st; }
+      }
       clearTimeout(v.idleT); v.idleT = setTimeout(() => { v.lastT = 0; setBuf(0); if ($('#rows')) renderWindow('idle'); }, 140);
+      clearTimeout(v.fabT); v.fabT = setTimeout(() => { const fb = $('.fab'); if (fb) fb.classList.remove('fabhide'); }, 1000);
     }
     v.raf = 0;
     const tw = $('#tw');

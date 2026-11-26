@@ -38,7 +38,6 @@
 .jmpbtn.on{opacity:1;transform:none;pointer-events:auto}
 html[data-anim="1"] .jmpbtn{transition:none}
 .fab{background:var(--accent);color:var(--accent-text)}
-.fab.fabhide{animation:none;transform:none;opacity:1;pointer-events:auto}
 /* ---- scroll slider ---- */
 .srail{width:40px}
 .sthumb{right:4px;width:4px;opacity:.55;background:var(--accent)}
@@ -122,14 +121,14 @@ html[data-anim="1"] .string .arc{transition:none}
   .toolbar{flex-direction:row;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:10px 14px 6px}
   .trow{display:contents}
   .search{order:1;flex:1 1 260px;max-width:440px;min-width:200px}
-  .tiles{order:2;flex:0 0 auto;flex-direction:row;gap:8px}
+  .tiles{order:7;flex:1 1 100%;flex-direction:row;gap:8px}
   .tiles .trw{flex:none;gap:8px}
   .ftile,.tiles .r2 .ftile{flex:none;width:112px;height:44px;flex-direction:column;gap:0}
   .tiles .r2 .ftile{width:136px}
   .ftile .tn{font-size:1rem}.ftile .tl{font-size:.7rem}
-  #tbRec{order:3}#tbPin{order:4}
+  #tbRec{order:2}#tbPin{order:3}
   .tbbtn{width:40px;height:40px}
-  #bImp{order:5;margin-left:auto}#bExp{order:6}#bNew{order:7}
+  #bImp{order:4;margin-left:auto}#bExp{order:5}#bNew{order:6}
   .jmpbtn{bottom:24px}
 }
 html.pc .ftile,html.pc .tiles .r2 .ftile{height:40px}
