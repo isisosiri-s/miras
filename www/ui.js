@@ -720,19 +720,19 @@ function onRowClick(e) {
 }
 function renderSelbar() {
   const s = $('#selbar'); if (!s) return;
-  const fab = $('#fab'); if (fab) fab.classList.toggle('hidden', !!(UI.sel.size || UI.selMode));
-  if (!UI.sel.size && !UI.selMode) { s.classList.add('hidden'); return; }
+  const fab = $('#fab'), on = !!(UI.sel.size || UI.selMode);
+  if (fab) fab.classList.toggle('hidden', on);
+  if (s.parentElement) s.parentElement.classList.toggle('selmode', on);
+  if (!on) { s.classList.add('hidden'); s.innerHTML = ''; return; }
   s.classList.remove('hidden');
-  s.innerHTML = `<button class="sb" id="sbX" aria-label="${esc(t('close'))}">${IC.close}</button><span>${t('sel_count', { n: UI.sel.size })}</span>
-    <button class="sb" id="sbAll">${t('sel_all')}</button>
-    <button class="sb" id="sbMark">${IC.ok(14, '#fff')}&nbsp;${t('sel_mark')}</button>
-    <button class="sb" id="sbPin">${IC.lamp(14)}&nbsp;${selRecords().length && selRecords().every(r => r.pin) ? t('pin_off') : t('pin_on')}</button>
-    <button class="sb" id="sbChg">${t('sel_change')}</button>
-    <button class="sb del" id="sbDel">${t('btn_delete')}</button>`;
+  const rs = selRecords(), allPin = rs.length && rs.every(r => r.pin);
+  s.innerHTML = `<div class="selhead"><button class="selx" id="sbX" aria-label="${esc(t('close'))}">${IC.close}</button><span class="selcnt">${t('sel_count', { n: UI.sel.size })}</span><button class="selall" id="sbAll">${t('sel_all')}</button></div>
+    <div class="selact">${scanUiOn() ? `<button class="sb pri" id="sbMark">${IC.ok(22, 'currentColor')}<span>${esc(t('col_scan'))}</span></button>` : ''}${H.rest ? `<button class="sb" id="sbRest">${IC.ok(22, 'currentColor')}<span>${esc(t('col_rest'))}</span></button>` : ''}<button class="sb" id="sbPin">${IC.lamp(22)}<span>${allPin ? t('pin_off') : t('pin_on')}</span></button><button class="sb" id="sbChg">${IC.edit}<span>${esc(t('sel_edit'))}</span></button><button class="sb del" id="sbDel">${IC.trash}<span>${t('btn_delete')}</span></button></div>`;
+  const rb = $('#sbRest'); if (rb) rb.onclick = () => { const r2 = selRecords().filter(r => !r.restored); r2.forEach(r => updateRecord(r, { restored: true })); toast(t('mass_done', { n: r2.length })); clearSel(); };
   $('#sbAll').onclick = () => { computeList().forEach(r => UI.sel.add(r.uuid)); UI.selMode = true; refreshList(); };
   $('#sbX').onclick = () => clearSel();
   $('#sbPin').onclick = () => { const rs = selRecords(), on = !rs.every(r => r.pin); rs.forEach(r => updateRecord(r, { pin: on })); toast(t(on ? 'pin_done' : 'unpin_done', { n: rs.length })); clearSel(); };
-  $('#sbMark').onclick = () => { const rs = selRecords().filter(r => !r.scanned); rs.forEach(r => updateRecord(r, { scanned: true })); toast(t('mass_done', { n: rs.length })); clearSel(); };
+  const mb = $('#sbMark'); if (mb) mb.onclick = () => { const rs = selRecords().filter(r => !r.scanned); rs.forEach(r => updateRecord(r, { scanned: true })); toast(t('mass_done', { n: rs.length })); clearSel(); };
   $('#sbDel').onclick = async () => {
     const rs = selRecords(); if (!rs.length) return;
     if (await confirmDlg(t('confirm_del', { n: rs.length }), t('btn_delete'), true)) { trashRecords(rs); toast(t('toast_trashed', { n: rs.length })); clearSel(); }

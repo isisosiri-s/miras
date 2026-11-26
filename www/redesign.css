@@ -144,3 +144,31 @@ html.pc .search input{border-radius:18px}
 @media (max-width:899px) and (min-width:0){.tiles .r2 .ftile{flex-direction:column;gap:0;height:48px}}
 .search .fchip svg{position:static;left:auto;top:auto}
 .fchip b{font-weight:700}
+
+/* selection mode */
+.selmode>.toolbar,.selmode>#banner,.selmode>.counter{display:none!important}
+.selbar{margin:0;padding:0;background:transparent;color:var(--text);display:block;min-height:0;animation:none}
+.selhead{display:flex;align-items:center;gap:8px;padding:8px 12px 6px;background:var(--bg)}
+.selx{width:44px;height:44px;border-radius:50%;border:1.5px solid var(--outline);display:flex;align-items:center;justify-content:center;color:var(--text);flex:none}
+.selcnt{flex:1;font-weight:700;font-size:1.05rem}
+.selall{height:40px;padding:0 16px;border-radius:20px;border:1.5px solid var(--outline);font-weight:600;font-size:.85rem;display:flex;align-items:center;color:var(--text);white-space:nowrap}
+.selact{position:absolute;left:0;right:0;bottom:0;display:flex;gap:8px;padding:10px 12px 12px;background:var(--bg);border-top:1px solid var(--border);z-index:9}
+.selbar .selact .sb{flex:1;min-width:0;height:60px;padding:0 2px;border-radius:14px;background:var(--surface);border:1px solid var(--border);color:var(--text);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:.72rem;font-weight:600;margin:0}
+.selbar .selact .sb span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.selbar .selact .sb.pri{background:var(--chipon);color:var(--chipon-text);border-color:var(--chipon)}
+.selbar .selact .sb.del{color:var(--bad);border-color:var(--bad);background:var(--surface)}
+.selmode>#tw{margin-bottom:84px}
+.selmode>.srail{bottom:84px}
+@media (max-height:500px){
+  .selact{padding:6px 12px}.selbar .selact .sb{height:44px;flex-direction:row;gap:6px}.selmode>#tw{margin-bottom:58px}.selmode>.srail{bottom:58px}
+  .selhead{padding:4px 12px}.selx{width:38px;height:38px}
+}
+@media (min-width:900px){
+  .selmode>.toolbar{display:flex!important}.selmode>.counter{display:flex!important}
+  .selhead{padding:6px 12px 0}
+  .selact{position:static;border:0;padding:6px 12px 8px;justify-content:flex-start}
+  .selbar .selact .sb{flex:none;height:32px;flex-direction:row;padding:0 14px;gap:6px;border-radius:4px;font-size:.9rem}
+  .selbar .selact .sb svg{width:16px;height:16px}
+  .selmode>#tw{margin-bottom:0}.selmode>.srail{bottom:0}
+}
+@media (max-width:360px){.selact{gap:5px;padding:10px 8px 12px}.selbar .selact .sb{font-size:.64rem;letter-spacing:-.2px}}

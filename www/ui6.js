@@ -16,15 +16,15 @@ Object.assign(IC, {
     ru: { menu_btn: 'Меню', nav_all: 'Все записи', flt_title: 'Фильтры колонок', flt_reset: 'Сбросить всё', set_scan: 'Скан', set_scan_sub: 'Галочка в карточке, колонка в списке и в Excel',
       set_scanui: 'Фильтры и счётчик сканирования', set_scanui_sub: 'Блоки «Есть скан / Нет скана» и счётчик в списке', set_rest: 'Реставрация', set_restui_sub: 'Блоки «Реставрирован / Не реставрирован» и счётчик в списке',
       set_g_look: 'Внешний вид', set_g_list: 'Список', set_g_sec: 'Безопасность', set_g_data: 'Данные', set_g_about: 'О приложении',
-      st_scanned_lbl: 'со сканом', trash_restore_all: 'Восстановить все', card_prev: 'Предыдущая запись', card_next: 'Следующая запись', trash_sel: 'Выбрано: {n}', theme_switch: 'Сменить тему' },
+      st_scanned_lbl: 'со сканом', trash_restore_all: 'Восстановить все', sel_edit: 'Изменить', card_prev: 'Предыдущая запись', card_next: 'Следующая запись', trash_sel: 'Выбрано: {n}', theme_switch: 'Сменить тему' },
     tk: { menu_btn: 'Menýu', nav_all: 'Ähli ýazgylar', flt_title: 'Sütün süzgüçleri', flt_reset: 'Hemmesini arassala', set_scan: 'Skan', set_scan_sub: 'Kartoçkada bellik, sanawda we Excel-de sütün',
       set_scanui: 'Skan: süzgüçler we sanawy', set_scanui_sub: 'Sanawda «Skan bar / Skan ýok» bloklary we sanawy', set_rest: 'Rejeleme', set_restui: 'Rejeleme: süzgüçler we sanawy', set_restui_sub: 'Sanawda «Rejelenen / Rejelenmedik» bloklary we sanawy',
       set_g_look: 'Daşky görnüş', set_g_list: 'Sanaw', set_g_sec: 'Howpsuzlyk', set_g_data: 'Maglumatlar', set_g_about: 'Programma barada',
-      st_scanned_lbl: 'skanly', trash_restore_all: 'Hemmesini dikelt', card_prev: 'Öňki ýazgy', card_next: 'Indiki ýazgy', trash_sel: 'Saýlanan: {n}', theme_switch: 'Temany üýtget' },
+      st_scanned_lbl: 'skanly', trash_restore_all: 'Hemmesini dikelt', sel_edit: 'Üýtget', card_prev: 'Öňki ýazgy', card_next: 'Indiki ýazgy', trash_sel: 'Saýlanan: {n}', theme_switch: 'Temany üýtget' },
     en: { menu_btn: 'Menu', nav_all: 'All records', flt_title: 'Column filters', flt_reset: 'Reset all', set_scan: 'Scan', set_scan_sub: 'Checkbox in the record, column in the list and Excel',
       set_scanui: 'Scan filters and counter', set_scanui_sub: '“Scanned / Not scanned” blocks and a counter in the list', set_rest: 'Restoration', set_restui_sub: '“Restored / Not restored” blocks and a counter in the list',
       set_g_look: 'Appearance', set_g_list: 'List', set_g_sec: 'Security', set_g_data: 'Data', set_g_about: 'About',
-      st_scanned_lbl: 'scanned', trash_restore_all: 'Restore all', card_prev: 'Previous record', card_next: 'Next record', trash_sel: 'Selected: {n}', theme_switch: 'Switch theme' },
+      st_scanned_lbl: 'scanned', trash_restore_all: 'Restore all', sel_edit: 'Edit', card_prev: 'Previous record', card_next: 'Next record', trash_sel: 'Selected: {n}', theme_switch: 'Switch theme' },
   };
   for (const l in S) Object.assign(I18N[l], S[l]);
   // the menu entry for the list is "All records", not "Books"
