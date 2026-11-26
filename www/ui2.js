@@ -213,8 +213,8 @@ async function viewSettings(main) {
   const again = () => viewSettings(main);
   $$('#sLang button', main).forEach(b => b.onclick = async () => { await setLang(b.dataset.v); });
   $$('#sTheme button', main).forEach(b => b.onclick = async () => {
-    if (animLevel() >= 2) { const de = document.documentElement; de.classList.add('themefade'); setTimeout(() => de.classList.remove('themefade'), 380); }
-    H.theme = b.dataset.v; applyPrefs(); await saveHeader(); again();
+    if (b.dataset.v === H.theme) return;
+    await window.switchTheme(b.dataset.v); again();
   });
   $$('#sAnim button', main).forEach(b => b.onclick = async () => { H.anim = +b.dataset.v; applyPrefs(); await saveHeader(); again(); });
   $$('#sFont button', main).forEach(b => b.onclick = async () => { H.font = b.dataset.v; applyPrefs(); await saveHeader(); again(); });

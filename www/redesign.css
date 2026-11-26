@@ -196,3 +196,13 @@ html.kbopen .tiles{display:none!important}
 html:not([data-anim="1"]) .drawerwrap:not(.out) .ditem{animation:dItemIn .32s cubic-bezier(.2,.8,.2,1) both;animation-delay:calc(var(--i,0) * 38ms + 90ms)}
 html:not([data-anim="1"]) .drawerwrap:not(.out) .dlang{animation:dItemIn .3s cubic-bezier(.2,.8,.2,1) both;animation-delay:40ms}
 @media (max-width:360px){.selact{padding:10px 6px 12px;gap:4px}.selbar .selact .sb{font-size:min(10.5px,3.1vw)}}
+
+/* phone: the screen title sits in the middle of the bar (between the burger and an empty right side) */
+@media (max-width:899px){
+  .appbar.mob{position:relative}
+  .appbar.mob h2{position:absolute;left:60px;right:60px;top:0;bottom:0;display:flex;align-items:center;justify-content:center;text-align:center;pointer-events:none}
+}
+
+/* theme cross-fade (View Transitions): the whole screen fades once, nothing else animates */
+::view-transition-group(root){animation-duration:.32s}
+::view-transition-old(root),::view-transition-new(root){animation-timing-function:ease;mix-blend-mode:normal}

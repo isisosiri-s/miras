@@ -52,8 +52,7 @@ async function openMenu() {
   pushLayer(layer);
   $('.dscrim', wrap).onclick = () => shut();
   $('#dTheme', wrap).onclick = async () => {
-    if (animLevel() >= 2) { const de = document.documentElement; de.classList.add('themefade'); setTimeout(() => de.classList.remove('themefade'), 380); }
-    H.theme = H.theme === 'dark' ? 'light' : 'dark'; applyPrefs(); await saveHeader(); $('#dTheme', wrap).innerHTML = H.theme === 'dark' ? IC.sun : IC.moon;
+    await window.switchTheme(H.theme === 'dark' ? 'light' : 'dark'); const tb = $('#dTheme', wrap); if (tb) tb.innerHTML = H.theme === 'dark' ? IC.sun : IC.moon;
   };
   $$('.dlang button', wrap).forEach(b => b.onclick = async () => { await shut(); setLang(b.dataset.l); });
   $$('[data-go]', wrap).forEach(b => b.onclick = async () => {
@@ -108,3 +107,14 @@ async function colFilterList() {
   const upd = () => document.documentElement.classList.toggle('kbopen', upright() && window.innerWidth < 900 && window.innerHeight < 520);
   window.addEventListener('resize', upd); window.addEventListener('orientationchange', () => setTimeout(upd, 200)); upd();
 })();
+
+// theme switch: one GPU cross-fade of two snapshots (View Transitions) instead of animating the colours of thousands of elements one by one, which froze weak phones.
+// Without the API (or with minimal animations) the theme just switches at once.
+window.switchTheme = async th => {
+  const apply = () => { H.theme = th; applyPrefs(); };
+  const vt = document.startViewTransition;
+  if (animLevel() >= 2 && typeof vt === 'function') {
+    try { const t = document.startViewTransition(apply); await t.updateCallbackDone; } catch (e) { if (H.theme !== th) apply(); }
+  } else apply();
+  await saveHeader();
+};

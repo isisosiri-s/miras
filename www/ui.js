@@ -528,7 +528,12 @@ function setBuf(rowsPerFrame) { VBUF = Math.max(VBUF0, Math.min(VBUFMAX, VBUF0 +
 UI.sort = null; UI.colf = {};
 UI.vr = { rh: 66, from: -1, to: -1, cols: null, raf: 0 };
 // row height = font size x --row-em (4.1 on phones: two-line titles, big touch rows; denser on the Windows app)
-function rowHeightPx() { const cs = getComputedStyle(document.documentElement); return Math.round(parseFloat(cs.fontSize) * (parseFloat(cs.getPropertyValue('--row-em')) || 4.1)); }
+let RH_KEY = '', RH_VAL = 0;
+function rowHeightPx() { // cached: reading computed style on every list refresh forced a full style recalculation
+  const de = document.documentElement, key = (de.dataset.font || '') + '|' + (window.innerWidth >= 900 ? 1 : 0) + '|' + (window.innerHeight < 520 ? 1 : 0) + '|' + (de.classList.contains('pc') ? 1 : 0);
+  if (key === RH_KEY && RH_VAL) return RH_VAL;
+  const cs = getComputedStyle(de); RH_VAL = Math.round(parseFloat(cs.fontSize) * (parseFloat(cs.getPropertyValue('--row-em')) || 4.1)); RH_KEY = key; return RH_VAL;
+}
 function renderWindow(force) {
   const rows = $('#rows'), tw = $('#tw'); const list = UI.list; if (!rows || !tw || !list || !list.length) return;
   const v = UI.vr, rh = v.rh, n = list.length;
@@ -584,7 +589,7 @@ function updateRail() {
   const max = tw.scrollHeight - tw.clientHeight;
   const show = railOn() && max > tw.clientHeight * 1.5;
   r.style.display = show ? 'block' : 'none'; if (!show) return;
-  const fb = $('.fab'), fabH = fb && getComputedStyle(fb).display !== 'none' && !fb.classList.contains('hidden') ? 84 : 0; // the track stops above the + button
+  const fb = $('.fab'), fabH = fb && window.innerWidth < 900 && !fb.classList.contains('hidden') ? 84 : 0; // the track stops above the + button
   const hh = ($('#th') || {}).offsetHeight || 38, rh = tw.clientHeight - hh - fabH;
   r.style.top = (tw.offsetTop + hh) + 'px'; r.style.height = rh + 'px';
   const k = Math.max(0, Math.min(1, tw.scrollTop / max));
@@ -624,7 +629,7 @@ function jmpScroll() {
   b.classList.remove('hidden'); b.classList.toggle('on', show);
   clearTimeout(JM.t); if (show) JM.t = setTimeout(() => b.classList.remove('on'), 2000);
 }
-function jmpUpdate() { const b = $('#jmpbtn'), tw = $('#tw'); if (!b || !tw) return; if (tw.scrollHeight - tw.clientHeight < tw.clientHeight * 1.5) b.classList.remove('on'); }
+function jmpUpdate() { const b = $('#jmpbtn'), tw = $('#tw'); if (!b || !tw || !b.classList.contains('on')) return; if (tw.scrollHeight - tw.clientHeight < tw.clientHeight * 1.5) b.classList.remove('on'); }
 
 // ---- column header menu: sort, filter, auto width, hide ----
 function setSort(key, dir) { UI.sort = dir ? { key, dir } : null; H.sort = UI.sort ? { ...UI.sort } : null; saveHeader(); refreshList(); } // the chosen order is a setting of THIS device (not synced)
@@ -721,7 +726,11 @@ function clearSel(fromBack) {
 function toggleSel(u) {
   if (UI.sel.has(u)) UI.sel.delete(u); else UI.sel.add(u);
   if (!isWide() && UI.sel.size === 0 && UI.selMode) { clearSel(); return; }
-  refreshList();
+  // only the tapped row and the selection bar change: no need to rebuild the whole window of rows
+  const row = $('#rows') && $(`#rows .tr[data-u="${CSS.escape(u)}"]`), on = UI.sel.has(u);
+  if (!row || !$('.cb', row)) { refreshList(); return; }
+  row.classList.toggle('sel', on); const cb = $('.cb', row); cb.classList.toggle('on', on); cb.innerHTML = on ? IC.ok(14, 'currentColor') : '';
+  renderSelbar();
 }
 function onRowClick(e) {
   const tr = e.target.closest('.tr'); if (!tr) return;
