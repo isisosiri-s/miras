@@ -153,9 +153,19 @@ window.Diag = (() => {
 window.Bench = (() => {
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   const measure = async (fn, tail = 250) => {
-    let mx = 0, bad = 0, last = performance.now(), run = true;
+    let mx = 0, bad = 0, last = performance.now(), run = true, worst = null, po = null;
+    try { po = new PerformanceObserver(l => { for (const e of l.getEntries()) if (!worst || e.duration > worst.duration) worst = e; }); po.observe({ type: 'long-animation-frame', buffered: false }); } catch (e) { po = null; }
     const f = t => { const d = t - last; last = t; if (d < 1500) { if (d > mx) mx = d; if (d > 50) bad++; } if (run) requestAnimationFrame(f); };
-    requestAnimationFrame(f); await fn(); await sleep(tail); run = false; return { mx: Math.round(mx), bad };
+    requestAnimationFrame(f); await fn(); await sleep(tail); run = false;
+    let info = '';
+    if (po) { try { po.takeRecords().forEach(e => { if (!worst || e.duration > worst.duration) worst = e; }); po.disconnect(); } catch (e) {}
+      if (worst) {
+        const sc = worst.scripts || [], js = sc.reduce((a, x) => a + x.duration, 0), forced = sc.reduce((a, x) => a + (x.forcedStyleAndLayoutDuration || 0), 0);
+        const end = worst.startTime + worst.duration, lay = Math.max(0, end - (worst.styleAndLayoutStart || end)), pre = Math.max(0, (worst.styleAndLayoutStart || end) - worst.renderStart);
+        const top = sc.slice().sort((a, b) => b.duration - a.duration)[0];
+        info = `кадр ${Math.round(worst.duration)}: скрипт ${Math.round(js)} (из них раскладка ${Math.round(forced)}) · стиль+раскладка ${Math.round(lay)} · до рендера ${Math.round(pre)} · пауза ${Math.round(Math.max(0, worst.renderStart - worst.startTime - js))}` + (top ? ` · главный: ${(top.sourceFunctionName || top.invoker || '?').slice(0, 28)} ${String(top.sourceURL || '').split('/').pop()}:${top.sourceCharPosition >= 0 ? top.sourceCharPosition : ''}` : '');
+      } }
+    return { mx: Math.round(mx), bad, info };
   };
   const swipe = async (y0, y1) => {
     const t = document.querySelector('#cBody') || document.querySelector('#cardhost'); if (!t) return;
@@ -173,18 +183,28 @@ window.Bench = (() => {
     document.body.append(shield, pill);
     const origTheme = H.theme, res = [], steps = [];
     const S = (name, fn, tail) => steps.push([name, fn, tail]);
-    S('Меню: открыть', async () => { openMenu(); await sleep(650); });
-    S('Меню: закрыть', async () => { const x = $('.dscrim'); if (x) x.click(); await sleep(350); });
+    const wide = isWide(); // PC / wide window: permanent sidebar, no drawer, no touch slider, no card swipe
+    if (!wide) {
+      S('Меню: открыть', async () => { openMenu(); await sleep(650); });
+      S('Меню: закрыть', async () => { const x = $('.dscrim'); if (x) x.click(); await sleep(350); });
+    }
     S('Тема: переключить', async () => { await switchTheme(origTheme === 'dark' ? 'light' : 'dark'); await sleep(300); }, 300);
     S('Тема: вернуть', async () => { await switchTheme(origTheme); await sleep(300); }, 300);
-    S('Ползунок: вниз', () => dragRail(true), 100);
-    S('Ползунок: вверх', () => dragRail(false), 100);
+    if (!wide) {
+      S('Ползунок: вниз', () => dragRail(true), 100);
+      S('Ползунок: вверх', () => dragRail(false), 100);
+    }
     S('Список: быстрая прокрутка', async () => { const tw = $('#tw'); if (!tw) return; tw.scrollTop = 0; await sleep(100); for (let i = 0; i < 70; i++) { tw.scrollTop += 150; await new Promise(r => requestAnimationFrame(r)); } await sleep(250); tw.scrollTop = 0; await sleep(200); });
     S('Поиск: ввод текста', async () => { const q = $('#q'); if (!q) return; q.focus(); for (const w of ['a', 'ab', 'abd', 'abdu']) { q.value = w; q.dispatchEvent(new Event('input', { bubbles: true })); await sleep(140); } q.value = ''; q.dispatchEvent(new Event('input', { bubbles: true })); q.blur(); await sleep(300); });
+    if (wide) {
+      S('Сортировка: по Инв. №', async () => { setSort('inv', 1); await sleep(450); }, 150);
+      S('Сортировка: сброс', async () => { setSort('inv', 0); await sleep(450); }, 150);
+      S('Фильтр: «Есть скан»', async () => { UI.filter = 'scanned'; renderChips(); refreshList(); await sleep(400); UI.filter = 'all'; renderChips(); refreshList(); await sleep(400); }, 150);
+      S('Список: горизонтальная прокрутка', async () => { const tw = $('#tw'); if (!tw) return; for (let i = 0; i < 30; i++) { tw.scrollLeft += 60; await new Promise(r => requestAnimationFrame(r)); } tw.scrollLeft = 0; await sleep(200); }, 100);
+    }
     S('Режим выбора', async () => { const l = UI.list || []; if (!l.length) return; UI.sel.clear(); UI.sel.add(l[3].uuid); UI.selMode = true; refreshList(); await sleep(350); clearSel(); await sleep(250); });
     S('Карточка: открыть', async () => { const l = UI.list || []; if (l.length) { openCard(l[5].uuid); await sleep(700); } });
-    S('Карточка: свайп вниз', () => swipe(200, 520), 200);
-    S('Карточка: свайп вверх', () => swipe(600, 200), 200);
+    if (!wide) { S('Карточка: свайп вниз', () => swipe(200, 520), 200); S('Карточка: свайп вверх', () => swipe(600, 200), 200); }
     S('Карточка: закрыть', async () => { await closeCard(true); await sleep(400); });
     for (const r of ['stats', 'reports', 'trash', 'columns', 'settings', 'ie', 'backup', 'sync']) S('Экран: ' + r, async () => { goRoute(r); await sleep(450); }, 150);
     S('Экран: список', async () => { goRoute('books'); await sleep(450); }, 150);
@@ -211,7 +231,7 @@ window.Bench = (() => {
     ov.innerHTML = `<div style="font:700 1.15rem system-ui;margin-bottom:4px">Проверка плавности</div>
       <div style="font:.85rem system-ui;opacity:.8;margin-bottom:10px">Версия ${esc(APP_VERSION)} · записей ${DB.records.length} · анимации ${animLevel()} · WebView ${ua} · ${window.innerWidth}×${window.innerHeight}</div>
       <div style="font:700 1rem system-ui;margin-bottom:10px"><span style="color:#2e9e4f">● ${ok} плавно</span>  <span style="color:#d19a10">● ${mid} терпимо</span>  <span style="color:#cc3b2e">● ${bad} тормозит</span></div>
-      <table style="width:100%;border-collapse:collapse;font:.92rem system-ui">${res.map(([n, r]) => `<tr style="border-bottom:1px solid var(--border)"><td style="padding:7px 4px">${esc(n)}</td><td style="padding:7px 4px;text-align:right;font-weight:700;color:${col(r.mx)}">${r.mx < 0 ? 'ошибка' : r.mx + ' мс'}</td><td style="padding:7px 4px;text-align:right;opacity:.7;width:56px">${r.bad ? '×' + r.bad : ''}</td></tr>`).join('')}</table>
+      <table style="width:100%;border-collapse:collapse;font:.92rem system-ui">${res.map(([n, r]) => `<tr style="border-bottom:1px solid var(--border)"><td style="padding:7px 4px">${esc(n)}${r.info ? `<div style="font-size:.68rem;opacity:.65;font-weight:400">${esc(r.info)}</div>` : ''}</td><td style="padding:7px 4px;text-align:right;font-weight:700;color:${col(r.mx)}">${r.mx < 0 ? 'ошибка' : r.mx + ' мс'}</td><td style="padding:7px 4px;text-align:right;opacity:.7;width:56px">${r.bad ? '×' + r.bad : ''}</td></tr>`).join('')}</table>
       <div style="font:.78rem system-ui;opacity:.7;margin:10px 0">Число — самый тяжёлый кадр (до 33 мс плавно, до 50 терпимо). «×N» — сколько кадров дольше 50 мс.</div>
       <div style="display:flex;gap:10px"><button class="sbtn" id="bnClose" style="flex:1;height:46px">Закрыть</button><button class="sbtn" id="bnAgain" style="flex:1;height:46px">Ещё раз</button></div>`;
     document.body.appendChild(ov);
