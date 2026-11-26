@@ -15,6 +15,21 @@ if (fs.existsSync(sp)) {
   if (!s.includes('windowLightStatusBar')) s = s.replace(/(<style name="AppTheme\.NoActionBar"[^>]*>)/, '$1\n        <item name="android:windowLightStatusBar">false</item>\n        <item name="android:windowLightNavigationBar">false</item>');
   fs.writeFileSync(sp, s);
 }
+// 2b) start-up without a black gap: system splash (Android 12+) and the window behind the WebView use the app's brown instead of the default black
+if (fs.existsSync(sp)) {
+  let s = fs.readFileSync(sp, 'utf8');
+  if (!s.includes('GAZNA_SPLASH')) {
+    const inject = (name, items) => {
+      const re = new RegExp('(<style name="' + name.replace(/\./g, '\\.') + '"[^>]*>)');
+      if (re.test(s)) { s = s.replace(re, '$1\n' + items); console.log('splash patch: ' + name); } else console.log('splash patch: style not found ' + name);
+    };
+    const win = '        <item name="android:windowBackground">@drawable/gazna_window_bg</item>';
+    inject('AppTheme.NoActionBar', win);
+    inject('AppTheme.NoActionBarLaunch', win + '\n        <item name="android:windowSplashScreenBackground">@color/gazna_splash_bg</item>\n        <item name="android:windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_foreground</item>');
+    s = s.replace('</resources>', '    <!-- GAZNA_SPLASH -->\n</resources>');
+    fs.writeFileSync(sp, s);
+  }
+}
 // 3) launcher icon
 function copyDir(src, dst) {
   for (const e of fs.readdirSync(src, { withFileTypes: true })) {

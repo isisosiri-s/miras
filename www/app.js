@@ -55,7 +55,8 @@ async function boot() {
   window.addEventListener('pagehide', () => { if (DB.unlocked) flushSave(); });
   Native.onBackButton(handleHardwareBack);
   Native.initBars();
-  window.addEventListener('resize', () => { if (DB.unlocked && UI.route === 'books') refreshList(); });
+  { let lw = window.innerWidth; // the on-screen keyboard only changes the height: no need to rebuild the whole list (it took ~180 ms on a phone every time the search field was tapped)
+    window.addEventListener('resize', () => { if (!(DB.unlocked && UI.route === 'books')) return; const w = window.innerWidth; if (w !== lw) { lw = w; refreshList(); } else { renderWindow(false); updateRail(); } }); }
   if (!ready) showSetup();
   else if (!Auth.hasPin()) { await Auth.openPlain(); afterUnlock(); }
   else showLock();

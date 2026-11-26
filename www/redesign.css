@@ -222,3 +222,6 @@ html:not([data-anim="1"]) .drawerwrap.go:not(.out) .dlang{animation:dItemIn .24s
 /* theme switch: no per-element colour transitions while the theme flips under the curtain */
 html.notr *,html.notr *::before,html.notr *::after{transition:none!important}
 
+
+/* half-height card: rounded corners come from the card's own background, not from clipping (overflow+radius forced a mask pass per frame on weak GPUs while swiping) */
+@media (max-width:899px){#cardhost[data-sheet=half]{overflow:visible}#cardhost[data-sheet=half] .cardhead{border-radius:18px 18px 0 0}}
