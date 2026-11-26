@@ -8,7 +8,8 @@
 /* ---- top row: burger, pill search, recent, pinned ---- */
 .toolbar{padding:8px 12px 4px;gap:8px}
 .trow{gap:6px}
-.tbmenu,.tbbtn{width:44px;height:44px;flex:none;border-radius:22px;display:flex;align-items:center;justify-content:center;color:var(--text)}
+.tbmenu,.tbbtn,#mbBack{width:44px;height:44px;flex:none;border-radius:22px;display:flex;align-items:center;justify-content:center;color:var(--text);background:var(--surface);border:1px solid var(--border)}
+.tbbtn.on{border-color:var(--chipon)}.tbpin.on{border-color:var(--gold)}
 .tbbtn.on{background:var(--chipon);color:var(--chipon-text)}
 .tbpin.on{background:var(--gold);color:#2B1A0A}
 .tbpin:not(.on){color:var(--gold)}
