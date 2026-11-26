@@ -522,9 +522,9 @@ function bindResize() {
   th.addEventListener('click', e => { if (e.target.closest('.rz')) { e.stopPropagation(); return; } const sp = e.target.closest('#th>span[data-k]'); if (sp) colMenu(sp.dataset.k); });
 }
 // ---- virtualised list: only the rows near the viewport exist in the DOM (fixed row height) ----
-const VBUF0 = 24, VBUFMAX = 72; // rows kept above / below the viewport (grows with the scroll speed: a fast fling must not outrun the drawn rows); the window is rebuilt only when the view gets within VMARGIN rows of its edge
-let VBUF = VBUF0, VMARGIN = 8;
-function setBuf(rowsPerFrame) { VBUF = Math.max(VBUF0, Math.min(VBUFMAX, VBUF0 + Math.ceil(rowsPerFrame * 6))); VMARGIN = Math.max(8, Math.round(VBUF / 3)); }
+const VBUF0 = 10, VBUFMAX = 72; // rows kept above / below the viewport (grows with the scroll speed: a fast fling must not outrun the drawn rows); the window is rebuilt only when the view gets within VMARGIN rows of its edge
+let VBUF = VBUF0, VMARGIN = 4;
+function setBuf(rowsPerFrame) { VBUF = Math.max(VBUF0, Math.min(VBUFMAX, VBUF0 + Math.ceil(rowsPerFrame * 6))); VMARGIN = Math.max(4, Math.round(VBUF / 3)); }
 UI.sort = null; UI.colf = {};
 UI.vr = { rh: 66, from: -1, to: -1, cols: null, raf: 0 };
 // row height = font size x --row-em (4.1 on phones: two-line titles, big touch rows; denser on the Windows app)
@@ -602,29 +602,34 @@ function bindRail() {
   const tw = $('#tw'), r = $('#srail'); if (!tw || !r) return;
   let ty = null, raf = 0, lastI = -1;
   // pointer events can arrive faster than frames: remember the last position and draw once per frame, with a small row buffer (the window is rebuilt on every jump anyway)
-  let busy = 0; // a slow phone: wait as long as the last frame took, so touch and compositing get the thread
+  // while the slider is held only the thumb and the "No. N" bubble move every frame (transforms, no layout reads); the rows catch up ~10 times a second
+  let rb0 = null, maxS = 0, nextR = 0, lastK = null, tTrail = 0;
   const frame = () => {
     raf = 0; if (ty === null) return;
-    const t0 = performance.now(); if (t0 < busy) { updateThumb(); raf = requestAnimationFrame(frame); return; }
-    window.Diag && Diag.mark('rail');
-    const b = r.getBoundingClientRect(), max = tw.scrollHeight - tw.clientHeight;
-    const k = Math.max(0, Math.min(1, (ty - b.top - RAIL_TH / 2) / (b.height - RAIL_TH)));
-    const n = (UI.list || []).length, i = Math.round(k * Math.max(0, n - 1));
-    if (i === lastI) { updateRail(); return; } lastI = i;
-    tw.scrollTop = k * max; renderWindow(false); updateRail();
-    const d = performance.now() - t0; busy = t0 + Math.max(40, d * 1.5);
+    if (!rb0) { rb0 = r.getBoundingClientRect(); maxS = tw.scrollHeight - tw.clientHeight; }
+    const k = Math.max(0, Math.min(1, (ty - rb0.top - RAIL_TH / 2) / (rb0.height - RAIL_TH))); lastK = k;
+    const n = (UI.list || []).length, i = Math.round(k * Math.max(0, n - 1)), y = k * (rb0.height - RAIL_TH);
+    const th = $('#sthumb'), bub = $('#sbub');
+    if (th) th.style.transform = `translateY(${y}px)`;
+    if (bub) { bub.style.transform = `translateY(${y + RAIL_TH / 2 - 17}px)`; if (i !== lastI) bub.textContent = '№ ' + fmtInt(Math.min(n, i + 1)); }
+    const now = performance.now();
+    if (i === lastI) return;
+    if (now < nextR) { clearTimeout(tTrail); tTrail = setTimeout(() => { if (ty !== null && !raf) raf = requestAnimationFrame(frame); }, nextR - now); return; }
+    lastI = i; window.Diag && Diag.mark('rail');
+    tw.scrollTop = k * maxS; renderWindow(false);
+    nextR = now + Math.max(80, (performance.now() - now) * 1.5);
   };
-  const updateThumb = () => { if (typeof updateRail === 'function') updateRail(); };
   let upT = [];
   const go = e => { ty = e.clientY; if (!raf) raf = requestAnimationFrame(frame); };
-  r.addEventListener('pointerdown', e => { e.preventDefault(); r.setPointerCapture(e.pointerId); r.classList.add('on'); UI.vr.drag = true; lastI = -1; VBUF = 2; VMARGIN = 1; go(e); });
+  r.addEventListener('pointerdown', e => { e.preventDefault(); r.setPointerCapture(e.pointerId); r.classList.add('on'); UI.vr.drag = true; lastI = -1; rb0 = null; nextR = 0; VBUF = 2; VMARGIN = 1; go(e); });
   r.addEventListener('pointermove', e => { if (r.classList.contains('on')) go(e); });
   const up = () => {
-    r.classList.remove('on'); ty = null; if (raf) { cancelAnimationFrame(raf); raf = 0; } UI.vr.drag = false; updateRail();
+    clearTimeout(tTrail); if (ty !== null && lastK !== null) { tw.scrollTop = lastK * maxS; renderWindow(false); }
+    r.classList.remove('on'); ty = null; if (raf) { cancelAnimationFrame(raf); raf = 0; } UI.vr.drag = false; rb0 = null; updateRail();
     // top the row window up in small steps instead of one big rebuild (one 180 ms frame on a weak phone)
-    upT.forEach(clearTimeout); upT = [8, 14, 24].map((n, i) => setTimeout(() => { if (UI.vr.drag) return; VBUF = n; VMARGIN = Math.max(1, Math.round(n / 3)); renderWindow('idle'); }, 120 + i * 140));
+    upT.forEach(clearTimeout); upT = [6, 8, 10].map((n, i) => setTimeout(() => { if (UI.vr.drag) return; VBUF = n; VMARGIN = Math.max(1, Math.round(n / 3)); renderWindow('idle'); }, 120 + i * 140));
   }; r.addEventListener('pointerup', up); r.addEventListener('pointercancel', up);
-  UI.railBench = { down: y => { r.classList.add('on'); UI.vr.drag = true; lastI = -1; VBUF = 2; VMARGIN = 1; go({ clientY: y }); }, move: y => go({ clientY: y }), up }; // used by the built-in smoothness test (synthetic pointers cannot be captured)
+  UI.railBench = { down: y => { r.classList.add('on'); UI.vr.drag = true; lastI = -1; rb0 = null; nextR = 0; VBUF = 2; VMARGIN = 1; go({ clientY: y }); }, move: y => go({ clientY: y }), up }; // used by the built-in smoothness test (synthetic pointers cannot be captured)
   const jb = $('#jmpbtn');
   if (jb) jb.onclick = () => { const mx = tw.scrollHeight - tw.clientHeight; tw.scrollTop = jb.dataset.dir === 'up' ? 0 : mx; jb.classList.remove('on'); };
   window.addEventListener('resize', updateRail);

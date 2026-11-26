@@ -70,7 +70,7 @@ async function openMenu(warm) {
   dr.addEventListener('touchend', () => { if (sx === null) return; sx = null; dr.style.transition = ''; if (dx < -70) shut(); else dr.style.transform = ''; }, { passive: true });
 }
 
-(function () { const w = () => { try { if (!document.querySelector('.drawer') && !UI.layers.length) openMenu('warm'); } catch (e) {} }; window.addEventListener('load', () => setTimeout(() => ('requestIdleCallback' in window ? requestIdleCallback(w, { timeout: 4000 }) : w()), 1500)); })();
+(function () { const w = () => { try { if (!document.querySelector('.drawer') && !UI.layers.length) openMenu('warm'); setTimeout(() => { try { invMap(); nameMap(); } catch (e) {} }, 400); } catch (e) {} }; window.addEventListener('load', () => setTimeout(() => ('requestIdleCallback' in window ? requestIdleCallback(w, { timeout: 4000 }) : w()), 1500)); })();
 
 // ---- funnel chip in the search field: the list of active column filters ----
 async function colFilterList() {

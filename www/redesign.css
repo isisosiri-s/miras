@@ -221,3 +221,4 @@ html:not([data-anim="1"]) .drawerwrap.go:not(.out) .dlang{animation:dItemIn .24s
 
 /* theme switch: no per-element colour transitions while the theme flips under the curtain */
 html.notr *,html.notr *::before,html.notr *::after{transition:none!important}
+
