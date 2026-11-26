@@ -249,18 +249,10 @@ async function viewSettings(main) {
 // ---------- import / export ----------
 function viewIE(main) {
   pageShell(main, t('ie_title'), `<div class="group">${rowLink('iImp', t('ie_import_xlsx'))}${rowLink('iXlsx', t('ie_export_xlsx'))}${rowLink('iCsv', t('ie_export_csv'))}</div>
-  <div class="hint">${t('ie_warn_plain')}</div>
-  <div class="group">${rowLink('iBk', t('ie_backup'), H.enc ? t('ie_enc_note') : '')}${rowLink('iRs', t('ie_restore'))}</div>`);
+  <div class="hint">${t('ie_warn_plain')}</div>`);
   $('#iImp').onclick = () => startImport();
   const plain = fn => async () => { if (await confirmDlg(t('ie_warn_plain'), t('ok'))) await fn(); };
   $('#iXlsx').onclick = plain(exportXlsx); $('#iCsv').onclick = plain(exportCsv);
-  $('#iBk').onclick = async () => { const n = await createBackup(); if (n) toast(t('backup_done', { f: n })); };
-  $('#iRs').onclick = async () => {
-    const f = await pickFile('.json,application/json'); if (!f) return;
-    const payload = await readFilePayload(await readText(f), 'backup'); if (!payload) return;
-    if (!(await confirmDlg(t('restore_confirm'), t('ie_restore'), true))) return;
-    const n = await restoreBackup(payload); UI.listKey = ''; toast(t('restore_ok', { n: fmtInt(n), w: noun('rec', n) }));
-  };
 }
 // ---------- backup (own menu item; used to live in Settings) ----------
 function viewBackup(main) {

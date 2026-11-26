@@ -135,6 +135,8 @@
   };
   const toState = (h, s, anim = true) => { h.dataset.sheet = s; h.style.borderRadius = s === 'half' ? '18px 18px 0 0' : ''; setTop(h, topOf(s), anim); };
   window.cardSheetReset = h => { h = h || $('#cardhost'); if (!h) return; clearTimeout(h._tt); h._ty = 0; h.style.top = ''; h.style.transform = ''; h.style.willChange = ''; h.style.transition = ''; h.style.borderRadius = ''; delete h.dataset.sheet; };
+  // the open animation keeps a hold on `transform`; drop it as soon as it is over, so that the first swipe does not have to tear it down (that was a hitch at the start of every swipe)
+  document.addEventListener('animationend', e => { const h = e.target; if (h && h.id === 'cardhost' && h.classList.contains('on') && (e.animationName === 'slideUp' || e.animationName === 'fadeIn')) h.style.animation = 'none'; });
   document.addEventListener('touchstart', e => {
     g = null; if (!sheetOk() || e.touches.length !== 1) return;
     const h = cardHost(); if (!h || !h.contains(e.target)) return;
