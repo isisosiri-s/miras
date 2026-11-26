@@ -33,7 +33,7 @@ Object.assign(IC, {
 }
 
 // ---- burger menu: a drawer from the left (opens only by tapping ☰: no edge swipe, it would fight Android's back gesture) ----
-async function openMenu() {
+async function openMenu(warm) {
   if ($('.drawer')) return;
   const trashN = DB.records.filter(r => r.del && !r.purged).length, total = counts().total;
   const items = [['books', 'nav_books', 'all', fmtInt(total)], ['trash', 'nav_trash', 'trashn', trashN ? String(trashN) : ''], ['reports', 'nav_reports', 'report', ''], ['stats', 'nav_stats', 'stats', ''], ['columns', 'nav_columns', 'cols', ''], ['ie', 'nav_import', 'imp', ''], ['backup', 'nav_backup', 'backup', ''], ['sync', 'nav_sync', 'sync', ''], ['settings', 'nav_settings', 'gear', '']];
@@ -44,6 +44,7 @@ async function openMenu() {
     <nav class="ditems">${items.map(([k, lab, ic, bd], ix) => `<button class="ditem${UI.route === k ? ' on' : ''}" data-go="${k}" style="--i:${ix}">${IC[ic]}<span>${esc(t(lab))}</span>${bd ? `<em>${esc(bd)}</em>` : ''}</button>`).join('')}
     ${Auth.hasPin() ? `<button class="ditem lock" data-go="__lock" style="--i:${items.length}">${IC.lock(20)}<span>${esc(t('nav_lock'))}</span></button>` : ''}</nav></aside>`;
   document.body.appendChild(wrap);
+  if (warm === 'warm') { wrap.style.cssText = 'visibility:hidden;pointer-events:none'; void wrap.offsetHeight; wrap.remove(); return; } // pre-warm: first real open has no style/layout cold start
   let closed = false; const layer = { onBack: () => { shut(true); return true; } };
   const shut = fromBack => {
     if (closed) return Promise.resolve(); closed = true; wrap.classList.add('out');
@@ -66,6 +67,8 @@ async function openMenu() {
   dr.addEventListener('touchmove', e => { if (sx === null) return; dx = Math.min(0, e.touches[0].clientX - sx); dr.style.transition = 'none'; dr.style.transform = `translateX(${dx}px)`; }, { passive: true });
   dr.addEventListener('touchend', () => { if (sx === null) return; sx = null; dr.style.transition = ''; if (dx < -70) shut(); else dr.style.transform = ''; }, { passive: true });
 }
+
+(function () { const w = () => { try { if (!document.querySelector('.drawer') && !UI.layers.length) openMenu('warm'); } catch (e) {} }; window.addEventListener('load', () => setTimeout(() => ('requestIdleCallback' in window ? requestIdleCallback(w, { timeout: 4000 }) : w()), 1500)); })();
 
 // ---- funnel chip in the search field: the list of active column filters ----
 async function colFilterList() {

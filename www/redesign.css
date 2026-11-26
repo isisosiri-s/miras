@@ -48,7 +48,7 @@ html[data-anim="1"] .jmpbtn{transition:none}
 /* ---- drawer ---- */
 .drawerwrap{position:fixed;inset:0;z-index:120}
 .dscrim{position:absolute;inset:0;background:rgba(10,5,0,.55);animation:fadeIn .2s ease both}
-.drawer{position:absolute;left:0;top:0;bottom:0;width:min(84vw,320px);background:var(--bg);display:flex;flex-direction:column;padding:calc(14px + env(safe-area-inset-top)) 12px calc(12px + env(safe-area-inset-bottom));overflow:auto;animation:drIn .22s cubic-bezier(.2,.8,.2,1) both;box-shadow:8px 0 30px rgba(0,0,0,.35);transition:transform .2s}
+.drawer{position:absolute;left:0;top:0;bottom:0;width:min(84vw,320px);background:var(--bg);display:flex;flex-direction:column;padding:calc(14px + env(safe-area-inset-top)) 12px calc(12px + env(safe-area-inset-bottom));overflow:auto;animation:drIn .22s cubic-bezier(.2,.8,.2,1) both;box-shadow:4px 0 12px rgba(0,0,0,.3);transition:transform .2s;will-change:transform;contain:layout paint;backface-visibility:hidden}
 .drawerwrap.out .drawer{animation:drOut .2s cubic-bezier(.4,0,1,1) both}
 .drawerwrap.out .dscrim{animation:fadeOut .2s ease both}
 @keyframes drIn{from{transform:translateX(-100%)}to{transform:none}}
@@ -192,8 +192,8 @@ html.kbopen .tiles{display:none!important}
 .ditem:has(+ .ditem.on){border-bottom-color:transparent}
 .ditem.lock{border-bottom:0}
 .ditem.on::before{content:'';position:absolute;left:0;top:10px;bottom:10px;width:4px;border-radius:0 3px 3px 0;background:var(--gold)}
-@keyframes dItemIn{from{opacity:0;transform:translateX(-22px)}to{opacity:1;transform:none}}
-html:not([data-anim="1"]) .drawerwrap:not(.out) .ditem{animation:dItemIn .32s cubic-bezier(.2,.8,.2,1) both;animation-delay:calc(var(--i,0) * 38ms + 90ms)}
+@keyframes dItemIn{from{opacity:0;transform:translate3d(-16px,0,0)}to{opacity:1;transform:none}}
+html:not([data-anim="1"]) .drawerwrap:not(.out) .ditem{animation:dItemIn .26s cubic-bezier(.2,.8,.2,1) both;animation-delay:calc(var(--i,0) * 30ms + 140ms)}
 html:not([data-anim="1"]) .drawerwrap:not(.out) .dlang{animation:dItemIn .3s cubic-bezier(.2,.8,.2,1) both;animation-delay:40ms}
 @media (max-width:360px){.selact{padding:10px 6px 12px;gap:4px}.selbar .selact .sb{font-size:min(10.5px,3.1vw)}}
 
