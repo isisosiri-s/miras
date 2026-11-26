@@ -101,3 +101,10 @@ async function colFilterList() {
   document.addEventListener('visibilitychange', () => { if (document.hidden) save(); });
   window.addEventListener('pagehide', save);
 })();
+
+// keyboard open on a phone held upright: the viewport gets short and looks like a landscape phone, but the screen is still upright -> mark it, the filter tiles step aside
+(() => {
+  const upright = () => { try { return screen.orientation ? /portrait/.test(screen.orientation.type) : screen.height >= screen.width; } catch (e) { return true; } };
+  const upd = () => document.documentElement.classList.toggle('kbopen', upright() && window.innerWidth < 900 && window.innerHeight < 520);
+  window.addEventListener('resize', upd); window.addEventListener('orientationchange', () => setTimeout(upd, 200)); upd();
+})();

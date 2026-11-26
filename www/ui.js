@@ -553,7 +553,7 @@ function renderWindow(force) {
 function flipHdr(p) { if (animLevel() < 2) return; p.classList.remove('hdrflip'); void p.offsetWidth; p.classList.add('hdrflip'); }
 const LAND_SHORT = '(max-height:520px),(max-height:660px) and (max-width:899px)';
 function onListScroll() {
-  const v = UI.vr; if (v.raf) return;
+  const v = UI.vr; if (v.raf || v.drag) return; // while the slider is held it draws the rows itself
   v.raf = requestAnimationFrame(now => {
     const tw0 = $('#tw');
     if (tw0) {
@@ -594,14 +594,20 @@ function updateRail() {
 }
 function bindRail() {
   const tw = $('#tw'), r = $('#srail'); if (!tw || !r) return;
-  const go = e => {
+  let ty = null, raf = 0, lastI = -1;
+  // pointer events can arrive faster than frames: remember the last position and draw once per frame, with a small row buffer (the window is rebuilt on every jump anyway)
+  const frame = () => {
+    raf = 0; if (ty === null) return;
     const b = r.getBoundingClientRect(), max = tw.scrollHeight - tw.clientHeight;
-    const k = Math.max(0, Math.min(1, (e.clientY - b.top - RAIL_TH / 2) / (b.height - RAIL_TH)));
-    setBuf(40); tw.scrollTop = k * max; renderWindow(false); updateRail(); // draw the rows right now: no blank frames under the finger
+    const k = Math.max(0, Math.min(1, (ty - b.top - RAIL_TH / 2) / (b.height - RAIL_TH)));
+    const n = (UI.list || []).length, i = Math.round(k * Math.max(0, n - 1));
+    if (i === lastI) { updateRail(); return; } lastI = i;
+    tw.scrollTop = k * max; renderWindow(false); updateRail();
   };
-  r.addEventListener('pointerdown', e => { e.preventDefault(); r.setPointerCapture(e.pointerId); r.classList.add('on'); go(e); });
+  const go = e => { ty = e.clientY; if (!raf) raf = requestAnimationFrame(frame); };
+  r.addEventListener('pointerdown', e => { e.preventDefault(); r.setPointerCapture(e.pointerId); r.classList.add('on'); UI.vr.drag = true; lastI = -1; VBUF = 8; VMARGIN = 3; go(e); });
   r.addEventListener('pointermove', e => { if (r.classList.contains('on')) go(e); });
-  const up = () => { r.classList.remove('on'); setBuf(0); updateRail(); }; r.addEventListener('pointerup', up); r.addEventListener('pointercancel', up);
+  const up = () => { r.classList.remove('on'); ty = null; if (raf) { cancelAnimationFrame(raf); raf = 0; } UI.vr.drag = false; setBuf(0); renderWindow('idle'); updateRail(); }; r.addEventListener('pointerup', up); r.addEventListener('pointercancel', up);
   const jb = $('#jmpbtn');
   if (jb) jb.onclick = () => { const mx = tw.scrollHeight - tw.clientHeight; tw.scrollTop = jb.dataset.dir === 'up' ? 0 : mx; jb.classList.remove('on'); };
   window.addEventListener('resize', updateRail);

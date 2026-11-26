@@ -645,7 +645,8 @@ html.slow #rows .tr.pin>span:first-child{box-shadow:inset 5px 0 0 #F2A81D}
 @media (min-width:900px){#cardhost.closing:not(.on){animation:slideRightOut .17s ease-in both}}
 .hdrflip>.toolbar,.hdrflip>.counter,.hdrflip>.banner,.hdrflip>.prog,.hdrflip>#banner{animation:fadeIn .22s ease both}
 .prog i{transition:width .55s cubic-bezier(.2,.8,.2,1)}
-html.themefade,html.themefade *,html.themefade *::before,html.themefade *::after{transition:background-color .3s ease,color .3s ease,border-color .3s ease,fill .3s ease,stroke .3s ease!important}
+html.themefade,html.themefade *:not(#rows *):not(#th *),html.themefade *::before,html.themefade *::after{transition:background-color .3s ease,color .3s ease,border-color .3s ease,fill .3s ease,stroke .3s ease!important}
+html.themefade #rows *,html.themefade #th *{transition:none!important}
 .dd-list{animation:ddIn .14s cubic-bezier(.2,.8,.2,1) both;transform-origin:top center}
 .dd-list.up{transform-origin:bottom center}
 @keyframes ddIn{from{opacity:0;transform:translateY(-4px) scale(.98)}to{opacity:1;transform:none}}
