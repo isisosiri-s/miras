@@ -184,3 +184,14 @@ html.pc .search input{border-radius:18px}
 html.kbopen .tiles{display:none!important}
 /* segmented buttons: long words (\u00ab\u041c\u0430\u043a\u0441\u0438\u043c\u0430\u043b\u044c\u043d\u0430\u044f\u00bb) must stay inside the frame with the large font */
 .seg button{flex:1 1 auto;min-width:0;padding:0 6px;white-space:nowrap;font-size:min(.82rem,3.5vw)}
+
+/* drawer: thin lines between items, a bar on the selected one, items slide in one after another (medium+ animations) */
+.ditems{gap:0}
+.ditem{position:relative;border-radius:0;border-bottom:1px solid var(--border)}
+.ditem.on{border-radius:12px;border-bottom-color:transparent}
+.ditem:has(+ .ditem.on){border-bottom-color:transparent}
+.ditem.lock{border-bottom:0}
+.ditem.on::before{content:'';position:absolute;left:0;top:10px;bottom:10px;width:4px;border-radius:0 3px 3px 0;background:var(--gold)}
+@keyframes dItemIn{from{opacity:0;transform:translateX(-22px)}to{opacity:1;transform:none}}
+html:not([data-anim="1"]) .drawerwrap:not(.out) .ditem{animation:dItemIn .32s cubic-bezier(.2,.8,.2,1) both;animation-delay:calc(var(--i,0) * 38ms + 90ms)}
+html:not([data-anim="1"]) .drawerwrap:not(.out) .dlang{animation:dItemIn .3s cubic-bezier(.2,.8,.2,1) both;animation-delay:40ms}

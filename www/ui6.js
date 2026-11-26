@@ -40,8 +40,8 @@ async function openMenu() {
   wrap.innerHTML = `<div class="dscrim"></div><aside class="drawer" role="dialog" aria-label="${esc(t('menu_btn'))}">
     <div class="dhead"><img src="icon.svg" alt="" width="44" height="44"><b>Gazna</b><button class="themebtn" id="dTheme" aria-label="${esc(t('theme_switch'))}">${H.theme === 'dark' ? IC.sun : IC.moon}</button></div>
     <div class="dlang">${['ru', 'tk', 'en'].map(l => `<button data-l="${l}" class="${H.lang === l ? 'on' : ''}">${l.toUpperCase()}</button>`).join('')}</div>
-    <nav class="ditems">${items.map(([k, lab, ic, bd]) => `<button class="ditem${UI.route === k ? ' on' : ''}" data-go="${k}">${IC[ic]}<span>${esc(t(lab))}</span>${bd ? `<em>${esc(bd)}</em>` : ''}</button>`).join('')}
-    ${Auth.hasPin() ? `<button class="ditem lock" data-go="__lock">${IC.lock(20)}<span>${esc(t('nav_lock'))}</span></button>` : ''}</nav></aside>`;
+    <nav class="ditems">${items.map(([k, lab, ic, bd], ix) => `<button class="ditem${UI.route === k ? ' on' : ''}" data-go="${k}" style="--i:${ix}">${IC[ic]}<span>${esc(t(lab))}</span>${bd ? `<em>${esc(bd)}</em>` : ''}</button>`).join('')}
+    ${Auth.hasPin() ? `<button class="ditem lock" data-go="__lock" style="--i:${items.length}">${IC.lock(20)}<span>${esc(t('nav_lock'))}</span></button>` : ''}</nav></aside>`;
   document.body.appendChild(wrap);
   let closed = false; const layer = { onBack: () => { shut(true); return true; } };
   const shut = fromBack => {
