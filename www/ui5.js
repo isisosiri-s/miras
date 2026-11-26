@@ -120,9 +120,21 @@
   const sheetOk = () => !isWide() && window.matchMedia('(max-width:899px)').matches;
   const topOf = s => (s === 'half' ? Math.round(window.innerHeight * HALF) : 0);
   const cardHost = () => { const h = $('#cardhost'); return h && h.classList.contains('on') ? h : null; };
-  const setTop = (h, px, anim) => { h.style.transition = anim && animLevel() >= 2 ? 'top .24s cubic-bezier(.2,.8,.2,1)' : 'none'; h.style.top = px + 'px'; };
+  // moving the sheet must not re-layout the whole card on every touch move: while dragging only a transform changes (GPU); the real `top` is set once when the gesture settles (then the transform animates from where the finger left it)
+  const drag = (h, top) => { h._ty = top - (parseFloat(h.style.top) || 0); h.style.willChange = 'transform'; h.style.transition = 'none'; h.style.transform = `translateY(${h._ty}px)`; };
+  const setTop = (h, px, anim) => {
+    const lay = parseFloat(h.style.top) || 0, vis = lay + (h._ty || 0), run = anim && animLevel() >= 2;
+    if (px >= window.innerHeight) { // sliding off the screen: transform only
+      h._ty = px - lay; h.style.willChange = 'transform'; h.style.transition = run ? 'transform .24s cubic-bezier(.2,.8,.2,1)' : 'none'; h.style.transform = `translateY(${h._ty}px)`; return;
+    }
+    h.style.transition = 'none'; h.style.top = px + 'px';
+    if (!run) { h._ty = 0; h.style.transform = ''; h.style.willChange = ''; return; }
+    h._ty = vis - px; h.style.transform = `translateY(${h._ty}px)`; void h.offsetHeight;
+    h.style.willChange = 'transform'; h.style.transition = 'transform .24s cubic-bezier(.2,.8,.2,1)'; h._ty = 0; h.style.transform = 'translateY(0px)';
+    clearTimeout(h._tt); h._tt = setTimeout(() => { if (!h._ty) { h.style.transition = ''; h.style.transform = ''; h.style.willChange = ''; } }, 300);
+  };
   const toState = (h, s, anim = true) => { h.dataset.sheet = s; h.style.borderRadius = s === 'half' ? '18px 18px 0 0' : ''; setTop(h, topOf(s), anim); };
-  window.cardSheetReset = h => { h = h || $('#cardhost'); if (!h) return; h.style.top = ''; h.style.transition = ''; h.style.borderRadius = ''; delete h.dataset.sheet; };
+  window.cardSheetReset = h => { h = h || $('#cardhost'); if (!h) return; clearTimeout(h._tt); h._ty = 0; h.style.top = ''; h.style.transform = ''; h.style.willChange = ''; h.style.transition = ''; h.style.borderRadius = ''; delete h.dataset.sheet; };
   document.addEventListener('touchstart', e => {
     g = null; if (!sheetOk() || e.touches.length !== 1) return;
     const h = cardHost(); if (!h || !h.contains(e.target)) return;
@@ -140,7 +152,7 @@
       if ((dy > 0 && atTop) || (dy < 0 && g.start === 'half')) { g.mode = 'sheet'; g.h.style.animation = 'none'; g.base = topOf(g.start); g.y0 = y; } else { g = null; return; }
     }
     e.preventDefault(); g.dy = y - g.y0;
-    const top = Math.max(0, Math.min(window.innerHeight, g.base + g.dy)); setTop(g.h, top, false); g.top = top;
+    const top = Math.max(0, Math.min(window.innerHeight, g.base + g.dy)); drag(g.h, top); g.top = top;
   }, { passive: false });
   const end = async () => {
     if (!g || g.mode !== 'sheet') { g = null; return; } const s = g; g = null; const h = s.h, dy = s.dy, v = dy / Math.max(1, performance.now() - s.t);
