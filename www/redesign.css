@@ -206,3 +206,14 @@ html:not([data-anim="1"]) .drawerwrap:not(.out) .dlang{animation:dItemIn .3s cub
 /* theme cross-fade (View Transitions): the whole screen fades once, nothing else animates */
 ::view-transition-group(root){animation-duration:.32s}
 ::view-transition-old(root),::view-transition-new(root){animation-timing-function:ease;mix-blend-mode:normal}
+
+/* selection bar: will-change:transform on .selbar made it the containing block of the bottom action row (row jumped to the top, over the status bar) */
+.selbar{will-change:auto!important;transform:none!important}
+.selact{bottom:env(safe-area-inset-bottom)}
+.selmode>#tw{margin-bottom:calc(84px + env(safe-area-inset-bottom))}
+.selmode>.srail{bottom:calc(84px + env(safe-area-inset-bottom))}
+@media (max-width:899px){.selbar .selact .sb svg{width:22px;height:22px;flex:none}}
+@media (min-width:900px){.selact{bottom:auto}.selmode>#tw{margin-bottom:0}.selmode>.srail{bottom:0}}
+@media (max-height:500px) and (min-width:560px){.selmode>#tw{margin-bottom:calc(58px + env(safe-area-inset-bottom))}.selmode>.srail{bottom:calc(58px + env(safe-area-inset-bottom))}}
+/* drawer: one line before "Lock", not two */
+.ditem.lock{margin-top:0;border-top:0}
