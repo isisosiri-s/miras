@@ -26,7 +26,7 @@
 .ftile{flex:1 1 0;min-width:0;height:56px;border-radius:14px;background:var(--surface);border:1px solid var(--border);color:var(--text);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;transition:background-color .15s,color .15s,transform .1s}
 .ftile:active{transform:scale(.97)}
 .ftile .tn{font-size:1.15rem;font-weight:700;line-height:1.15;font-variant-numeric:tabular-nums}
-.ftile .tl{font-size:.72rem;opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;padding:0 4px}
+.ftile .tl{font-size:min(.72rem,3.1vw);opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;padding:0 4px}
 .r2 .ftile .tl{overflow:visible;max-width:none}
 .ftile.on{background:var(--chipon);color:var(--chipon-text);border-color:var(--chipon)}
 .tiles.two .ftile{height:50px}
@@ -74,8 +74,8 @@ html[data-anim="1"] .drawer,html[data-anim="1"] .dscrim,html[data-anim="1"] .dra
 @media (max-width:899px) and (orientation:landscape) and (max-height:660px){
   .toolbar{flex-direction:row;align-items:center;padding:4px 10px;gap:6px}
   .trow{display:contents}
-  .tbmenu{order:0}.search{order:1;flex:1 1 0;min-width:120px}.tiles{order:2;flex:1.4 1 0;min-width:0;flex-direction:row;gap:6px}.tbRec,#tbRec{order:3}#tbPin{order:4}
-  .tiles .trw{flex:1;gap:6px}.ftile{height:40px;flex-direction:row;gap:6px}.ftile .tn{font-size:.95rem}.ftile .tl{font-size:.68rem}
+  .tbmenu{order:0}.search{order:1;flex:1 1 0;min-width:90px}.tiles{order:2;flex:2.4 1 0;min-width:0;flex-direction:row;gap:6px}.tbRec,#tbRec{order:3}#tbPin{order:4}
+  .tiles .trw{flex:1;gap:6px}.ftile{height:40px;flex-direction:row;gap:6px}.ftile .tn{font-size:.95rem}.ftile .tl{font-size:min(.68rem,1.35vw)}
   .tiles.two{flex-direction:column;gap:4px}.tiles.two .ftile,.tiles .r2 .ftile{height:30px}
   .tbmenu,.tbbtn{width:40px;height:40px}
   .search input{height:40px}.search svg{top:11px}
@@ -161,7 +161,7 @@ html.pc .search input{border-radius:18px}
 .selbar .selact .sb.del{color:var(--bad);border-color:var(--bad);background:var(--surface)}
 .selmode>#tw{margin-bottom:84px}
 .selmode>.srail{bottom:84px}
-@media (max-height:500px){
+@media (max-height:500px) and (min-width:560px){
   .selact{padding:6px 12px}.selbar .selact .sb{height:44px;flex-direction:row;gap:6px}.selmode>#tw{margin-bottom:58px}.selmode>.srail{bottom:58px}
   .selhead{padding:4px 12px}.selx{width:38px;height:38px}
 }
@@ -183,7 +183,7 @@ html.pc .search input{border-radius:18px}
 /* phone in portrait with the keyboard open: the list needs the room, the filter tiles wait */
 html.kbopen .tiles{display:none!important}
 /* segmented buttons: long words (\u00ab\u041c\u0430\u043a\u0441\u0438\u043c\u0430\u043b\u044c\u043d\u0430\u044f\u00bb) must stay inside the frame with the large font */
-.seg button{flex:1 1 auto;min-width:0;padding:0 6px;white-space:nowrap;font-size:min(.82rem,3.5vw)}
+.seg button{flex:1 1 auto;min-width:0;padding:0 6px;white-space:nowrap;font-size:min(.82rem,3.1vw)}
 
 /* drawer: thin lines between items, a bar on the selected one, items slide in one after another (medium+ animations) */
 .ditems{gap:0}
@@ -195,3 +195,4 @@ html.kbopen .tiles{display:none!important}
 @keyframes dItemIn{from{opacity:0;transform:translateX(-22px)}to{opacity:1;transform:none}}
 html:not([data-anim="1"]) .drawerwrap:not(.out) .ditem{animation:dItemIn .32s cubic-bezier(.2,.8,.2,1) both;animation-delay:calc(var(--i,0) * 38ms + 90ms)}
 html:not([data-anim="1"]) .drawerwrap:not(.out) .dlang{animation:dItemIn .3s cubic-bezier(.2,.8,.2,1) both;animation-delay:40ms}
+@media (max-width:360px){.selact{padding:10px 6px 12px;gap:4px}.selbar .selact .sb{font-size:min(10.5px,3.1vw)}}
