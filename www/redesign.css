@@ -121,18 +121,20 @@ html[data-anim="1"] .string .arc{transition:none}
   .toolbar{flex-direction:row;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:10px 14px 6px}
   .trow{display:contents}
   .search{order:1;flex:1 1 260px;max-width:440px;min-width:200px}
-  .tiles{order:7;flex:1 1 100%;flex-direction:row;gap:8px}
+  .tiles{order:2;flex:0 0 auto;flex-direction:row;gap:8px}
   .tiles .trw{flex:none;gap:8px}
   .ftile,.tiles .r2 .ftile{flex:none;width:112px;height:44px;flex-direction:column;gap:0}
   .tiles .r2 .ftile{width:136px}
   .ftile .tn{font-size:1rem}.ftile .tl{font-size:.7rem}
-  #tbRec{order:2}#tbPin{order:3}
-  .tbbtn{width:40px;height:40px}
-  #bImp{order:4;margin-left:auto}#bExp{order:5}#bNew{order:6}
+  #tbRec{order:3}#tbPin{order:4}
+  .tbbtn{width:44px;height:44px;border-radius:12px;background:var(--surface);border:1px solid var(--border);color:var(--text)}
+  .tbbtn.on{background:var(--chipon);color:var(--chipon-text);border-color:var(--chipon)}
+  #tbPin.on{background:var(--gold);border-color:var(--gold);color:#2B1A0A}
+  #bNew{order:7;margin-left:auto}
   .jmpbtn{bottom:24px}
 }
 html.pc .ftile,html.pc .tiles .r2 .ftile{height:40px}
-html.pc .tbbtn{width:34px;height:34px}
+html.pc .tbbtn{width:40px;height:40px}
 html.pc .search input{border-radius:18px}
 
 .tiles .r2 .ftile{gap:5px}.tiles .r2 .ftile .tl{font-size:.66rem;padding:0}
@@ -171,3 +173,4 @@ html.pc .search input{border-radius:18px}
   .selmode>#tw{margin-bottom:0}.selmode>.srail{bottom:0}
 }
 @media (max-width:360px){.selact{gap:5px;padding:10px 8px 12px}.selbar .selact .sb{font-size:.64rem;letter-spacing:-.2px}}
+@media (min-width:900px){#bImp,#bExp{display:none!important}}
