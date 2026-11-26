@@ -14,15 +14,15 @@ Object.assign(IC, {
 });
 {
   const S = {
-    ru: { menu_btn: 'Меню', nav_backup: 'Резервная копия', nav_all: 'Все записи', flt_title: 'Фильтры колонок', flt_reset: 'Сбросить всё', set_scan: 'Скан', set_scan_sub: 'Галочка в карточке, колонка в списке и в Excel',
+    ru: { search_ph: 'Поиск', menu_btn: 'Меню', nav_backup: 'Резервная копия', nav_all: 'Все записи', flt_title: 'Фильтры колонок', flt_reset: 'Сбросить всё', set_scan: 'Скан', set_scan_sub: 'Галочка в карточке, колонка в списке и в Excel',
       set_scanui: 'Фильтры и счётчик сканирования', set_scanui_sub: 'Блоки «Есть скан / Нет скана» и счётчик в списке', set_rest: 'Реставрация', set_restui_sub: 'Блоки «Реставрирован / Не реставрирован» и счётчик в списке',
       set_g_look: 'Внешний вид', set_g_list: 'Список', set_g_sec: 'Безопасность', set_g_data: 'Данные', set_g_about: 'О приложении',
       st_scanned_lbl: 'со сканом', trash_restore_all: 'Восстановить все', sel_edit: 'Изменить', card_prev: 'Предыдущая запись', card_next: 'Следующая запись', trash_sel: 'Выбрано: {n}', theme_switch: 'Сменить тему' },
-    tk: { menu_btn: 'Menýu', nav_backup: 'Ätiýaçlyk nusga', nav_all: 'Ähli ýazgylar', flt_title: 'Sütün süzgüçleri', flt_reset: 'Hemmesini arassala', set_scan: 'Skan', set_scan_sub: 'Kartoçkada bellik, sanawda we Excel-de sütün',
+    tk: { search_ph: 'Gözleg', menu_btn: 'Menýu', nav_backup: 'Ätiýaçlyk nusga', nav_all: 'Ähli ýazgylar', flt_title: 'Sütün süzgüçleri', flt_reset: 'Hemmesini arassala', set_scan: 'Skan', set_scan_sub: 'Kartoçkada bellik, sanawda we Excel-de sütün',
       set_scanui: 'Skan: süzgüçler we sanawy', set_scanui_sub: 'Sanawda «Skan bar / Skan ýok» bloklary we sanawy', set_rest: 'Rejeleme', set_restui: 'Rejeleme: süzgüçler we sanawy', set_restui_sub: 'Sanawda «Rejelenen / Rejelenmedik» bloklary we sanawy',
       set_g_look: 'Daşky görnüş', set_g_list: 'Sanaw', set_g_sec: 'Howpsuzlyk', set_g_data: 'Maglumatlar', set_g_about: 'Programma barada',
       st_scanned_lbl: 'skanly', trash_restore_all: 'Hemmesini dikelt', sel_edit: 'Üýtget', card_prev: 'Öňki ýazgy', card_next: 'Indiki ýazgy', trash_sel: 'Saýlanan: {n}', theme_switch: 'Temany üýtget' },
-    en: { menu_btn: 'Menu', nav_backup: 'Backup', nav_all: 'All records', flt_title: 'Column filters', flt_reset: 'Reset all', set_scan: 'Scan', set_scan_sub: 'Checkbox in the record, column in the list and Excel',
+    en: { search_ph: 'Search', menu_btn: 'Menu', nav_backup: 'Backup', nav_all: 'All records', flt_title: 'Column filters', flt_reset: 'Reset all', set_scan: 'Scan', set_scan_sub: 'Checkbox in the record, column in the list and Excel',
       set_scanui: 'Scan filters and counter', set_scanui_sub: '“Scanned / Not scanned” blocks and a counter in the list', set_rest: 'Restoration', set_restui_sub: '“Restored / Not restored” blocks and a counter in the list',
       set_g_look: 'Appearance', set_g_list: 'List', set_g_sec: 'Security', set_g_data: 'Data', set_g_about: 'About',
       st_scanned_lbl: 'scanned', trash_restore_all: 'Restore all', sel_edit: 'Edit', card_prev: 'Previous record', card_next: 'Next record', trash_sel: 'Selected: {n}', theme_switch: 'Switch theme' },
@@ -44,6 +44,7 @@ async function openMenu(warm) {
     <nav class="ditems">${items.map(([k, lab, ic, bd], ix) => `<button class="ditem${UI.route === k ? ' on' : ''}" data-go="${k}" style="--i:${ix}">${IC[ic]}<span>${esc(t(lab))}</span>${bd ? `<em>${esc(bd)}</em>` : ''}</button>`).join('')}
     ${Auth.hasPin() ? `<button class="ditem lock" data-go="__lock" style="--i:${items.length}">${IC.lock(20)}<span>${esc(t('nav_lock'))}</span></button>` : ''}</nav></aside>`;
   document.body.appendChild(wrap);
+  if (warm !== 'warm' && window.Diag) Diag.mark('menu');
   if (warm === 'warm') { wrap.style.cssText = 'visibility:hidden;pointer-events:none'; void wrap.offsetHeight; wrap.remove(); return; } // pre-warm: first real open has no style/layout cold start
   let closed = false; const layer = { onBack: () => { shut(true); return true; } };
   const shut = fromBack => {
@@ -112,13 +113,37 @@ async function colFilterList() {
   window.addEventListener('resize', upd); window.addEventListener('orientationchange', () => setTimeout(upd, 200)); upd();
 })();
 
-// theme switch: one GPU cross-fade of two snapshots (View Transitions) instead of animating the colours of thousands of elements one by one, which froze weak phones.
-// Without the API (or with minimal animations) the theme just switches at once.
+// theme switch: a single cheap curtain layer; with minimal animations the theme just switches at once.
 window.switchTheme = async th => {
   const apply = () => { H.theme = th; applyPrefs(); };
-  const vt = document.startViewTransition;
-  if (animLevel() >= 2 && typeof vt === 'function') {
-    try { const t = document.startViewTransition(apply); await t.updateCallbackDone; } catch (e) { if (H.theme !== th) apply(); }
+  window.Diag && Diag.mark('theme');
+  if (animLevel() >= 2) {
+    // one cheap layer: fade to the new background, switch under it, fade away (no snapshots, no per-element transitions)
+    const c = document.createElement('div'); c.style.cssText = `position:fixed;inset:0;z-index:300;pointer-events:none;opacity:0;background:${th === 'dark' ? '#1C1712' : '#F6F1E9'};transition:opacity .16s ease-out;will-change:opacity`;
+    document.body.appendChild(c); void c.offsetWidth; c.style.opacity = '1';
+    await new Promise(r => setTimeout(r, 170)); apply();
+    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+    c.style.transition = 'opacity .2s ease-in'; c.style.opacity = '0'; setTimeout(() => c.remove(), 260);
   } else apply();
   await saveHeader();
 };
+
+// ---- diagnostics: hidden frame counter (Settings -> tap the version 5 times). Shows the worst frame during menu / theme / slider.
+window.Diag = (() => {
+  const D = { on: false, hold: {}, until: {}, mark(n) { if (!D.on) return; const now = performance.now(); if (!(D.until[n] > now)) D.hold[n] = 0; D.until[n] = now + (n === 'rail' ? 700 : 1200); } };
+  let box, last = 0, fr = [], shown = 0, raf = 0;
+  const loop = now => {
+    if (!D.on) return; const dt = now - last; last = now; if (dt > 0 && dt < 2000) { fr.push(dt); if (fr.length > 40) fr.shift(); for (const n in D.until) if (D.until[n] > now) D.hold[n] = Math.max(D.hold[n] || 0, dt); }
+    if (now - shown > 300) { shown = now; const avg = fr.reduce((a, b) => a + b, 0) / (fr.length || 1), mx = Math.max(0, ...fr);
+      box.textContent = `fps ${Math.round(1000 / (avg || 16))} · max ${Math.round(mx)}ms\n` + ['menu', 'theme', 'rail'].map(n => `${n} ${Math.round(D.hold[n] || 0)}`).join(' · '); }
+    raf = requestAnimationFrame(loop);
+  };
+  D.set = v => {
+    D.on = v; try { localStorage.setItem('gz_diag', v ? '1' : ''); } catch (e) {}
+    if (v) { if (!box) { box = document.createElement('div'); box.style.cssText = 'position:fixed;right:4px;top:calc(env(safe-area-inset-top) + 4px);z-index:9999;background:rgba(0,0,0,.78);color:#7CFF7C;font:11px/1.35 monospace;padding:3px 6px;border-radius:6px;white-space:pre;pointer-events:none'; document.body.appendChild(box); } box.style.display = ''; last = performance.now(); raf = requestAnimationFrame(loop); }
+    else { if (box) box.style.display = 'none'; cancelAnimationFrame(raf); }
+  };
+  let ok = false; try { ok = !!localStorage.getItem('gz_diag'); } catch (e) {}
+  if (ok) window.addEventListener('load', () => D.set(true));
+  return D;
+})();

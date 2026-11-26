@@ -601,16 +601,20 @@ function bindRail() {
   const tw = $('#tw'), r = $('#srail'); if (!tw || !r) return;
   let ty = null, raf = 0, lastI = -1;
   // pointer events can arrive faster than frames: remember the last position and draw once per frame, with a small row buffer (the window is rebuilt on every jump anyway)
+  let busy = 0; // a slow phone: wait as long as the last frame took, so touch and compositing get the thread
   const frame = () => {
     raf = 0; if (ty === null) return;
+    const t0 = performance.now(); if (t0 < busy) { raf = requestAnimationFrame(frame); return; }
+    window.Diag && Diag.mark('rail');
     const b = r.getBoundingClientRect(), max = tw.scrollHeight - tw.clientHeight;
     const k = Math.max(0, Math.min(1, (ty - b.top - RAIL_TH / 2) / (b.height - RAIL_TH)));
     const n = (UI.list || []).length, i = Math.round(k * Math.max(0, n - 1));
     if (i === lastI) { updateRail(); return; } lastI = i;
     tw.scrollTop = k * max; renderWindow(false); updateRail();
+    const d = performance.now() - t0; busy = d > 22 ? t0 + d : 0;
   };
   const go = e => { ty = e.clientY; if (!raf) raf = requestAnimationFrame(frame); };
-  r.addEventListener('pointerdown', e => { e.preventDefault(); r.setPointerCapture(e.pointerId); r.classList.add('on'); UI.vr.drag = true; lastI = -1; VBUF = 8; VMARGIN = 3; go(e); });
+  r.addEventListener('pointerdown', e => { e.preventDefault(); r.setPointerCapture(e.pointerId); r.classList.add('on'); UI.vr.drag = true; lastI = -1; VBUF = 2; VMARGIN = 1; go(e); });
   r.addEventListener('pointermove', e => { if (r.classList.contains('on')) go(e); });
   const up = () => { r.classList.remove('on'); ty = null; if (raf) { cancelAnimationFrame(raf); raf = 0; } UI.vr.drag = false; setBuf(0); renderWindow('idle'); updateRail(); }; r.addEventListener('pointerup', up); r.addEventListener('pointercancel', up);
   const jb = $('#jmpbtn');
