@@ -46,9 +46,10 @@ async function openMenu(warm) {
   document.body.appendChild(wrap);
   if (warm !== 'warm' && window.Diag) Diag.mark('menu');
   if (warm === 'warm') { wrap.style.cssText = 'visibility:hidden;pointer-events:none'; void wrap.offsetHeight; wrap.remove(); return; } // pre-warm: first real open has no style/layout cold start
+  const goT = setTimeout(() => wrap.classList.add('go'), animLevel() >= 2 ? 210 : 0);
   let closed = false; const layer = { onBack: () => { shut(true); return true; } };
   const shut = fromBack => {
-    if (closed) return Promise.resolve(); closed = true; wrap.classList.add('out');
+    if (closed) return Promise.resolve(); closed = true; clearTimeout(goT); wrap.classList.add('go', 'out');
     setTimeout(() => wrap.remove(), animLevel() >= 2 ? 200 : 0);
     if (!fromBack) return dropLayer(layer); const i = UI.layers.indexOf(layer); if (i >= 0) UI.layers.splice(i, 1); return Promise.resolve();
   };
@@ -121,8 +122,8 @@ window.switchTheme = async th => {
     // one cheap layer: fade to the new background, switch under it, fade away (no snapshots, no per-element transitions)
     const c = document.createElement('div'); c.style.cssText = `position:fixed;inset:0;z-index:300;pointer-events:none;opacity:0;background:${th === 'dark' ? '#1C1712' : '#F6F1E9'};transition:opacity .16s ease-out;will-change:opacity`;
     document.body.appendChild(c); void c.offsetWidth; c.style.opacity = '1';
-    await new Promise(r => setTimeout(r, 170)); apply();
-    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+    await new Promise(r => setTimeout(r, 170)); const de = document.documentElement; de.classList.add('notr'); apply(); void de.offsetWidth;
+    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))); de.classList.remove('notr');
     c.style.transition = 'opacity .2s ease-in'; c.style.opacity = '0'; setTimeout(() => c.remove(), 260);
   } else apply();
   await saveHeader();
@@ -146,4 +147,76 @@ window.Diag = (() => {
   let ok = false; try { ok = !!localStorage.getItem('gz_diag'); } catch (e) {}
   if (ok) window.addEventListener('load', () => D.set(true));
   return D;
+})();
+
+// ---- built-in smoothness test: Settings -> "Smoothness test". Walks through the app by itself and measures the worst frame of every action.
+window.Bench = (() => {
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const measure = async (fn, tail = 250) => {
+    let mx = 0, bad = 0, last = performance.now(), run = true;
+    const f = t => { const d = t - last; last = t; if (d < 1500) { if (d > mx) mx = d; if (d > 50) bad++; } if (run) requestAnimationFrame(f); };
+    requestAnimationFrame(f); await fn(); await sleep(tail); run = false; return { mx: Math.round(mx), bad };
+  };
+  const swipe = async (y0, y1) => {
+    const t = document.querySelector('#cBody') || document.querySelector('#cardhost'); if (!t) return;
+    const mk = (type, y) => { const tt = new Touch({ identifier: 1, target: t, clientX: 200, clientY: y }); t.dispatchEvent(new TouchEvent(type, { touches: type === 'touchend' ? [] : [tt], changedTouches: [tt], bubbles: true, cancelable: true })); };
+    mk('touchstart', y0); for (let i = 1; i <= 14; i++) { mk('touchmove', y0 + (y1 - y0) * i / 14); await sleep(16); } mk('touchend', y1); await sleep(450);
+  };
+  const dragRail = async (down) => {
+    const r = $('#srail'), rb = UI.railBench; if (!r || !rb) return; const b = r.getBoundingClientRect(), a = b.top + 24, z = b.bottom - 24;
+    rb.down(down ? a : z); for (let i = 1; i <= 36; i++) { rb.move(down ? a + (z - a) * i / 36 : z - (z - a) * i / 36); await sleep(16); } rb.up(); await sleep(650);
+  };
+  const run = async () => {
+    if (Bench.busy) return; Bench.busy = true;
+    const shield = document.createElement('div'); shield.style.cssText = 'position:fixed;inset:0;z-index:9997;background:transparent';
+    const pill = document.createElement('div'); pill.style.cssText = 'position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 16px);transform:translateX(-50%);z-index:9998;background:rgba(0,0,0,.82);color:#fff;font:600 14px system-ui;padding:8px 14px;border-radius:20px;white-space:nowrap';
+    document.body.append(shield, pill);
+    const origTheme = H.theme, res = [], steps = [];
+    const S = (name, fn, tail) => steps.push([name, fn, tail]);
+    S('Меню: открыть', async () => { openMenu(); await sleep(650); });
+    S('Меню: закрыть', async () => { const x = $('.dscrim'); if (x) x.click(); await sleep(350); });
+    S('Тема: переключить', async () => { await switchTheme(origTheme === 'dark' ? 'light' : 'dark'); await sleep(300); }, 300);
+    S('Тема: вернуть', async () => { await switchTheme(origTheme); await sleep(300); }, 300);
+    S('Ползунок: вниз', () => dragRail(true), 100);
+    S('Ползунок: вверх', () => dragRail(false), 100);
+    S('Список: быстрая прокрутка', async () => { const tw = $('#tw'); if (!tw) return; tw.scrollTop = 0; await sleep(100); for (let i = 0; i < 70; i++) { tw.scrollTop += 150; await new Promise(r => requestAnimationFrame(r)); } await sleep(250); tw.scrollTop = 0; await sleep(200); });
+    S('Поиск: ввод текста', async () => { const q = $('#q'); if (!q) return; q.focus(); for (const w of ['a', 'ab', 'abd', 'abdu']) { q.value = w; q.dispatchEvent(new Event('input', { bubbles: true })); await sleep(140); } q.value = ''; q.dispatchEvent(new Event('input', { bubbles: true })); q.blur(); await sleep(300); });
+    S('Режим выбора', async () => { const l = UI.list || []; if (!l.length) return; UI.sel.clear(); UI.sel.add(l[3].uuid); UI.selMode = true; refreshList(); await sleep(350); clearSel(); await sleep(250); });
+    S('Карточка: открыть', async () => { const l = UI.list || []; if (l.length) { openCard(l[5].uuid); await sleep(700); } });
+    S('Карточка: свайп вниз', () => swipe(200, 520), 200);
+    S('Карточка: свайп вверх', () => swipe(600, 200), 200);
+    S('Карточка: закрыть', async () => { await closeCard(true); await sleep(400); });
+    for (const r of ['stats', 'reports', 'trash', 'columns', 'settings', 'ie', 'backup', 'sync']) S('Экран: ' + r, async () => { goRoute(r); await sleep(450); }, 150);
+    S('Экран: список', async () => { goRoute('books'); await sleep(450); }, 150);
+    try {
+      if (UI.route !== 'books') { goRoute('books'); await sleep(600); }
+      const diagWas = window.Diag && Diag.on; if (diagWas) Diag.set(false);
+      for (let i = 0; i < steps.length; i++) {
+        pill.textContent = `Проверка ${i + 1}/${steps.length} — не трогайте экран`;
+        let r; try { r = await measure(steps[i][1], steps[i][2]); } catch (e) { r = { mx: -1, bad: 0, err: String(e && e.message || e).slice(0, 60) }; }
+        res.push([steps[i][0], r]);
+      }
+      if (diagWas) Diag.set(true);
+    } finally {
+      try { if (H.theme !== origTheme) await switchTheme(origTheme); } catch (e) {}
+      shield.remove(); pill.remove(); Bench.busy = false;
+    }
+    show(res);
+  };
+  const show = res => {
+    const col = m => m < 0 ? '#999' : m <= 33 ? '#2e9e4f' : m <= 50 ? '#d19a10' : '#cc3b2e';
+    const ok = res.filter(([, r]) => r.mx >= 0 && r.mx <= 33).length, mid = res.filter(([, r]) => r.mx > 33 && r.mx <= 50).length, bad = res.filter(([, r]) => r.mx > 50).length;
+    const ov = document.createElement('div'); ov.style.cssText = 'position:fixed;inset:0;z-index:9998;background:var(--bg);color:var(--text);overflow:auto;padding:calc(env(safe-area-inset-top) + 14px) 14px calc(env(safe-area-inset-bottom) + 14px)';
+    const ua = (navigator.userAgent.match(/Chrome\/(\d+)/) || [])[1] || '?';
+    ov.innerHTML = `<div style="font:700 1.15rem system-ui;margin-bottom:4px">Проверка плавности</div>
+      <div style="font:.85rem system-ui;opacity:.8;margin-bottom:10px">Версия ${esc(APP_VERSION)} · записей ${DB.records.length} · анимации ${animLevel()} · WebView ${ua} · ${window.innerWidth}×${window.innerHeight}</div>
+      <div style="font:700 1rem system-ui;margin-bottom:10px"><span style="color:#2e9e4f">● ${ok} плавно</span>  <span style="color:#d19a10">● ${mid} терпимо</span>  <span style="color:#cc3b2e">● ${bad} тормозит</span></div>
+      <table style="width:100%;border-collapse:collapse;font:.92rem system-ui">${res.map(([n, r]) => `<tr style="border-bottom:1px solid var(--border)"><td style="padding:7px 4px">${esc(n)}</td><td style="padding:7px 4px;text-align:right;font-weight:700;color:${col(r.mx)}">${r.mx < 0 ? 'ошибка' : r.mx + ' мс'}</td><td style="padding:7px 4px;text-align:right;opacity:.7;width:56px">${r.bad ? '×' + r.bad : ''}</td></tr>`).join('')}</table>
+      <div style="font:.78rem system-ui;opacity:.7;margin:10px 0">Число — самый тяжёлый кадр (до 33 мс плавно, до 50 терпимо). «×N» — сколько кадров дольше 50 мс.</div>
+      <div style="display:flex;gap:10px"><button class="sbtn" id="bnClose" style="flex:1;height:46px">Закрыть</button><button class="sbtn" id="bnAgain" style="flex:1;height:46px">Ещё раз</button></div>`;
+    document.body.appendChild(ov);
+    $('#bnClose', ov).onclick = () => ov.remove();
+    $('#bnAgain', ov).onclick = () => { ov.remove(); setTimeout(run, 100); };
+  };
+  return { run, busy: false };
 })();

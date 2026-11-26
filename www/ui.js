@@ -559,6 +559,7 @@ function flipHdr(p) { if (animLevel() < 2) return; p.classList.remove('hdrflip')
 const LAND_SHORT = '(max-height:520px),(max-height:660px) and (max-width:899px)';
 function onListScroll() {
   const v = UI.vr; if (v.raf || v.drag) return; // while the slider is held it draws the rows itself
+  window.Diag && Diag.mark('scroll');
   v.raf = requestAnimationFrame(now => {
     const tw0 = $('#tw');
     if (tw0) {
@@ -604,19 +605,26 @@ function bindRail() {
   let busy = 0; // a slow phone: wait as long as the last frame took, so touch and compositing get the thread
   const frame = () => {
     raf = 0; if (ty === null) return;
-    const t0 = performance.now(); if (t0 < busy) { raf = requestAnimationFrame(frame); return; }
+    const t0 = performance.now(); if (t0 < busy) { updateThumb(); raf = requestAnimationFrame(frame); return; }
     window.Diag && Diag.mark('rail');
     const b = r.getBoundingClientRect(), max = tw.scrollHeight - tw.clientHeight;
     const k = Math.max(0, Math.min(1, (ty - b.top - RAIL_TH / 2) / (b.height - RAIL_TH)));
     const n = (UI.list || []).length, i = Math.round(k * Math.max(0, n - 1));
     if (i === lastI) { updateRail(); return; } lastI = i;
     tw.scrollTop = k * max; renderWindow(false); updateRail();
-    const d = performance.now() - t0; busy = d > 22 ? t0 + d : 0;
+    const d = performance.now() - t0; busy = t0 + Math.max(40, d * 1.5);
   };
+  const updateThumb = () => { if (typeof updateRail === 'function') updateRail(); };
+  let upT = [];
   const go = e => { ty = e.clientY; if (!raf) raf = requestAnimationFrame(frame); };
   r.addEventListener('pointerdown', e => { e.preventDefault(); r.setPointerCapture(e.pointerId); r.classList.add('on'); UI.vr.drag = true; lastI = -1; VBUF = 2; VMARGIN = 1; go(e); });
   r.addEventListener('pointermove', e => { if (r.classList.contains('on')) go(e); });
-  const up = () => { r.classList.remove('on'); ty = null; if (raf) { cancelAnimationFrame(raf); raf = 0; } UI.vr.drag = false; setBuf(0); renderWindow('idle'); updateRail(); }; r.addEventListener('pointerup', up); r.addEventListener('pointercancel', up);
+  const up = () => {
+    r.classList.remove('on'); ty = null; if (raf) { cancelAnimationFrame(raf); raf = 0; } UI.vr.drag = false; updateRail();
+    // top the row window up in small steps instead of one big rebuild (one 180 ms frame on a weak phone)
+    upT.forEach(clearTimeout); upT = [8, 14, 24].map((n, i) => setTimeout(() => { if (UI.vr.drag) return; VBUF = n; VMARGIN = Math.max(1, Math.round(n / 3)); renderWindow('idle'); }, 120 + i * 140));
+  }; r.addEventListener('pointerup', up); r.addEventListener('pointercancel', up);
+  UI.railBench = { down: y => { r.classList.add('on'); UI.vr.drag = true; lastI = -1; VBUF = 2; VMARGIN = 1; go({ clientY: y }); }, move: y => go({ clientY: y }), up }; // used by the built-in smoothness test (synthetic pointers cannot be captured)
   const jb = $('#jmpbtn');
   if (jb) jb.onclick = () => { const mx = tw.scrollHeight - tw.clientHeight; tw.scrollTop = jb.dataset.dir === 'up' ? 0 : mx; jb.classList.remove('on'); };
   window.addEventListener('resize', updateRail);
@@ -940,6 +948,7 @@ function bindCombo(root, key) {
 }
 const bindCombos = root => ['loc', 'lang', 'author'].forEach(k => bindCombo(root, k));
 async function openCard(uuid, draftVals, silentRerender, presetType) {
+  window.Diag && Diag.mark('card');
   if (UI.card && !silentRerender) {
     if (UI.card.uuid === uuid && !!uuid) return;
     const ok = await confirmLeaveCard(); if (!ok) return;

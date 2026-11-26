@@ -193,8 +193,9 @@ html.kbopen .tiles{display:none!important}
 .ditem.lock{border-bottom:0}
 .ditem.on::before{content:'';position:absolute;left:0;top:10px;bottom:10px;width:4px;border-radius:0 3px 3px 0;background:var(--gold)}
 @keyframes dItemIn{from{opacity:0;transform:translate3d(-16px,0,0)}to{opacity:1;transform:none}}
-html:not([data-anim="1"]) .drawerwrap:not(.out) .ditem{animation:dItemIn .26s cubic-bezier(.2,.8,.2,1) both;animation-delay:calc(var(--i,0) * 30ms + 140ms)}
-html:not([data-anim="1"]) .drawerwrap:not(.out) .dlang{animation:dItemIn .3s cubic-bezier(.2,.8,.2,1) both;animation-delay:40ms}
+html:not([data-anim="1"]) .drawerwrap:not(.go):not(.out) .ditem,html:not([data-anim="1"]) .drawerwrap:not(.go):not(.out) .dlang{opacity:0}
+html:not([data-anim="1"]) .drawerwrap.go:not(.out) .ditem{animation:dItemIn .24s cubic-bezier(.2,.8,.2,1) both;animation-delay:calc(var(--i,0) * 26ms)}
+html:not([data-anim="1"]) .drawerwrap.go:not(.out) .dlang{animation:dItemIn .24s cubic-bezier(.2,.8,.2,1) both}
 @media (max-width:360px){.selact{padding:10px 6px 12px;gap:4px}.selbar .selact .sb{font-size:min(10.5px,3.1vw)}}
 
 /* phone: the screen title sits in the middle of the bar (between the burger and an empty right side) */
@@ -217,3 +218,6 @@ html:not([data-anim="1"]) .drawerwrap:not(.out) .dlang{animation:dItemIn .3s cub
 @media (max-height:500px) and (min-width:560px){.selmode>#tw{margin-bottom:calc(58px + env(safe-area-inset-bottom))}.selmode>.srail{bottom:calc(58px + env(safe-area-inset-bottom))}}
 /* drawer: one line before "Lock", not two */
 .ditem.lock{margin-top:0;border-top:0}
+
+/* theme switch: no per-element colour transitions while the theme flips under the curtain */
+html.notr *,html.notr *::before,html.notr *::after{transition:none!important}

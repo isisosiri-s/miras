@@ -207,9 +207,10 @@ async function viewSettings(main) {
   ${rowSwitch('sBio', t('set_bio'), bioOk ? t('set_bio_sub') : t('set_bio_na'), H.bio && bioOk, !bioOk)}` : ''}
   ${rowSwitch('sShot', t('set_shot'), Native.canBlockShots() ? t('set_shot_sub') : t('set_shot_na'), H.shot)}`)}
   ${G(t('set_g_data'), `${rowLink('sTrash', t('set_trash'), trashN ? `${trashN}` : '')}`)}
-  ${G(t('set_g_about'), `<div class="setrow" id="verRow"><div class="tt">${t('set_version')}</div><span class="ss">${APP_VERSION}</span></div>`)}`);
+  ${G(t('set_g_about'), `${rowLink('sBench', ({ ru: 'Проверка плавности', tk: 'Tekiz işlemegiň barlagy', en: 'Smoothness test' })[LANG] || 'Smoothness test')}<div class="setrow" id="verRow"><div class="tt">${t('set_version')}</div><span class="ss">${APP_VERSION}</span></div>`)}`);
   main.querySelector('.page').scrollTop = sc;
   const again = () => viewSettings(main);
+  { const bb = $('#sBench', main); if (bb) bb.onclick = () => window.Bench && Bench.run(); }
   { let n = 0, tm = 0; $('#verRow', main).onclick = () => { n++; clearTimeout(tm); tm = setTimeout(() => n = 0, 1500); if (n >= 5 && window.Diag) { n = 0; Diag.set(!Diag.on); toast(Diag.on ? 'Diag ON' : 'Diag OFF'); } }; }
   $$('#sLang button', main).forEach(b => b.onclick = async () => { await setLang(b.dataset.v); });
   $$('#sTheme button', main).forEach(b => b.onclick = async () => {
