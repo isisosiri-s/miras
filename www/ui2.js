@@ -206,8 +206,7 @@ async function viewSettings(main) {
   ${hasPin ? `<div class="setrow col"><div class="tt">${t('set_autolock')}</div><select class="inp" id="sAl">${alOpts.map(([v, l]) => `<option value="${v}" ${H.autolock === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
   ${rowSwitch('sBio', t('set_bio'), bioOk ? t('set_bio_sub') : t('set_bio_na'), H.bio && bioOk, !bioOk)}` : ''}
   ${rowSwitch('sShot', t('set_shot'), Native.canBlockShots() ? t('set_shot_sub') : t('set_shot_na'), H.shot)}`)}
-  ${G(t('set_g_data'), `${rowLink('sTrash', t('set_trash'), trashN ? `${trashN}` : '')}
-  <div class="setrow"><div class="tt">${t('set_backup')}<div class="ss">${bk}</div>${Native.cap ? `<div class="ss">${t('backup_warn')}</div>` : ''}</div><button class="sbtn" id="sBk">${t('set_backup_btn')}</button></div>`)}
+  ${G(t('set_g_data'), `${rowLink('sTrash', t('set_trash'), trashN ? `${trashN}` : '')}`)}
   ${G(t('set_g_about'), `<div class="setrow"><div class="tt">${t('set_version')}</div><span class="ss">${APP_VERSION}</span></div>`)}`);
   main.querySelector('.page').scrollTop = sc;
   const again = () => viewSettings(main);
@@ -245,7 +244,6 @@ async function viewSettings(main) {
     if (pin) { await Auth.changePw(pin); if (H.bio) await Native.bioSave(pin); toast(t('pw_ok')); }
   };
   $('#sCols').onclick = () => goRoute('columns'); $('#sTrash').onclick = () => goRoute('trash');
-  $('#sBk').onclick = async () => { const n = await createBackup(); if (n) toast(t('backup_done', { f: n })); again(); };
 }
 
 // ---------- import / export ----------
@@ -258,6 +256,20 @@ function viewIE(main) {
   $('#iXlsx').onclick = plain(exportXlsx); $('#iCsv').onclick = plain(exportCsv);
   $('#iBk').onclick = async () => { const n = await createBackup(); if (n) toast(t('backup_done', { f: n })); };
   $('#iRs').onclick = async () => {
+    const f = await pickFile('.json,application/json'); if (!f) return;
+    const payload = await readFilePayload(await readText(f), 'backup'); if (!payload) return;
+    if (!(await confirmDlg(t('restore_confirm'), t('ie_restore'), true))) return;
+    const n = await restoreBackup(payload); UI.listKey = ''; toast(t('restore_ok', { n: fmtInt(n), w: noun('rec', n) }));
+  };
+}
+// ---------- backup (own menu item; used to live in Settings) ----------
+function viewBackup(main) {
+  const last = H.lastBackup ? t('set_backup_last', { d: fmtDateTime(H.lastBackup) }) : t('backup_never');
+  pageShell(main, t('nav_backup'), `<div class="group"><div class="setrow"><div class="tt">${t('set_backup')}<div class="ss">${last}</div>${H.enc ? `<div class="ss">${t('ie_enc_note')}</div>` : ''}</div><button class="sbtn pri" id="bkNow">${t('set_backup_btn')}</button></div>
+    <button class="setrow" id="bkRest"><div class="tt">${t('ie_restore')}</div><span class="chev">${IC.chev}</span></button></div>
+  ${Native.cap ? `<div class="hint">${t('backup_warn')}</div>` : ''}`);
+  $('#bkNow').onclick = async () => { const n = await createBackup(); if (n) toast(t('backup_done', { f: n })); viewBackup(main); };
+  $('#bkRest').onclick = async () => {
     const f = await pickFile('.json,application/json'); if (!f) return;
     const payload = await readFilePayload(await readText(f), 'backup'); if (!payload) return;
     if (!(await confirmDlg(t('restore_confirm'), t('ie_restore'), true))) return;

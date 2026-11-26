@@ -140,7 +140,7 @@
     const h = cardHost(); if (!h || !h.contains(e.target)) return;
     if (e.target.closest('input,select,textarea,button,.dd,.dd-btn,.dd-list,[contenteditable]')) return;
     const body = e.target.closest('#cBody');
-    g = { y: e.touches[0].clientY, x: e.touches[0].clientX, t: performance.now(), h, mode: null, dy: 0, start: h.dataset.sheet === 'half' ? 'half' : 'full', bodyTop: body ? body.scrollTop : 0, body };
+    h.style.willChange = 'transform'; /* promote the sheet to its own layer before the finger moves */ g = { y: e.touches[0].clientY, x: e.touches[0].clientX, t: performance.now(), h, mode: null, dy: 0, start: h.dataset.sheet === 'half' ? 'half' : 'full', bodyTop: body ? body.scrollTop : 0, body };
   }, { passive: true });
   document.addEventListener('touchmove', e => {
     if (!g) return; const y = e.touches[0].clientY, dy = y - g.y, dx = e.touches[0].clientX - g.x;

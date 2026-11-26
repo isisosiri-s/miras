@@ -282,7 +282,7 @@ function showSetup() {
 }
 
 // ---------- shell ----------
-const NAV = [['books', 'nav_books', 'book'], ['stats', 'nav_stats', 'stats'], ['reports', 'nav_reports', 'report'], ['trash', 'nav_trash', 'trashn'], ['columns', 'nav_columns', 'cols'], ['ie', 'nav_import', 'imp'], ['sync', 'nav_sync', 'sync'], ['settings', 'nav_settings', 'gear']];
+const NAV = [['books', 'nav_books', 'book'], ['stats', 'nav_stats', 'stats'], ['reports', 'nav_reports', 'report'], ['trash', 'nav_trash', 'trashn'], ['columns', 'nav_columns', 'cols'], ['ie', 'nav_import', 'imp'], ['backup', 'nav_backup', 'backup'], ['sync', 'nav_sync', 'sync'], ['settings', 'nav_settings', 'gear']];
 function mountShell() {
   UI.route = 'books'; UI.routeLayer = null; UI.card = null;
   UI.sort = H.sort && H.sort.key && colDef(H.sort.key) && (H.sort.dir === 1 || H.sort.dir === -1) ? { key: H.sort.key, dir: H.sort.dir } : null;
@@ -348,7 +348,7 @@ function goRoute(r) {
 function renderRoute() {
   const main = $('#main'); if (!main) return;
   $$('.side .nav[data-r]').forEach(b => b.classList.toggle('on', b.dataset.r === UI.route));
-  const views = { books: viewBooks, stats: viewStats, reports: viewReports, trash: viewTrash, columns: viewColumns, settings: viewSettings, ie: viewIE, sync: viewSync, import: viewImport };
+  const views = { books: viewBooks, stats: viewStats, reports: viewReports, trash: viewTrash, columns: viewColumns, settings: viewSettings, ie: viewIE, backup: viewBackup, sync: viewSync, import: viewImport };
   UI.selMode = UI.selMode && UI.route === 'books';
   (views[UI.route] || viewBooks)(main);
 }

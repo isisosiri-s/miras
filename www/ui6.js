@@ -1,5 +1,6 @@
 // ===== Gazna 1.3 redesign layer: icons, strings, menu drawer, hints, font guard, column-filter list =====
 Object.assign(IC, {
+  backup: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6"/></svg>',
   up: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5.5 11.5L12 5l6.5 6.5"/></svg>',
   down: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5.5 12.5L12 19l6.5-6.5"/></svg>',
   recent: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.2 2"/></svg>',
@@ -13,15 +14,15 @@ Object.assign(IC, {
 });
 {
   const S = {
-    ru: { menu_btn: 'Меню', nav_all: 'Все записи', flt_title: 'Фильтры колонок', flt_reset: 'Сбросить всё', set_scan: 'Скан', set_scan_sub: 'Галочка в карточке, колонка в списке и в Excel',
+    ru: { menu_btn: 'Меню', nav_backup: 'Резервная копия', nav_all: 'Все записи', flt_title: 'Фильтры колонок', flt_reset: 'Сбросить всё', set_scan: 'Скан', set_scan_sub: 'Галочка в карточке, колонка в списке и в Excel',
       set_scanui: 'Фильтры и счётчик сканирования', set_scanui_sub: 'Блоки «Есть скан / Нет скана» и счётчик в списке', set_rest: 'Реставрация', set_restui_sub: 'Блоки «Реставрирован / Не реставрирован» и счётчик в списке',
       set_g_look: 'Внешний вид', set_g_list: 'Список', set_g_sec: 'Безопасность', set_g_data: 'Данные', set_g_about: 'О приложении',
       st_scanned_lbl: 'со сканом', trash_restore_all: 'Восстановить все', sel_edit: 'Изменить', card_prev: 'Предыдущая запись', card_next: 'Следующая запись', trash_sel: 'Выбрано: {n}', theme_switch: 'Сменить тему' },
-    tk: { menu_btn: 'Menýu', nav_all: 'Ähli ýazgylar', flt_title: 'Sütün süzgüçleri', flt_reset: 'Hemmesini arassala', set_scan: 'Skan', set_scan_sub: 'Kartoçkada bellik, sanawda we Excel-de sütün',
+    tk: { menu_btn: 'Menýu', nav_backup: 'Ätiýaçlyk nusga', nav_all: 'Ähli ýazgylar', flt_title: 'Sütün süzgüçleri', flt_reset: 'Hemmesini arassala', set_scan: 'Skan', set_scan_sub: 'Kartoçkada bellik, sanawda we Excel-de sütün',
       set_scanui: 'Skan: süzgüçler we sanawy', set_scanui_sub: 'Sanawda «Skan bar / Skan ýok» bloklary we sanawy', set_rest: 'Rejeleme', set_restui: 'Rejeleme: süzgüçler we sanawy', set_restui_sub: 'Sanawda «Rejelenen / Rejelenmedik» bloklary we sanawy',
       set_g_look: 'Daşky görnüş', set_g_list: 'Sanaw', set_g_sec: 'Howpsuzlyk', set_g_data: 'Maglumatlar', set_g_about: 'Programma barada',
       st_scanned_lbl: 'skanly', trash_restore_all: 'Hemmesini dikelt', sel_edit: 'Üýtget', card_prev: 'Öňki ýazgy', card_next: 'Indiki ýazgy', trash_sel: 'Saýlanan: {n}', theme_switch: 'Temany üýtget' },
-    en: { menu_btn: 'Menu', nav_all: 'All records', flt_title: 'Column filters', flt_reset: 'Reset all', set_scan: 'Scan', set_scan_sub: 'Checkbox in the record, column in the list and Excel',
+    en: { menu_btn: 'Menu', nav_backup: 'Backup', nav_all: 'All records', flt_title: 'Column filters', flt_reset: 'Reset all', set_scan: 'Scan', set_scan_sub: 'Checkbox in the record, column in the list and Excel',
       set_scanui: 'Scan filters and counter', set_scanui_sub: '“Scanned / Not scanned” blocks and a counter in the list', set_rest: 'Restoration', set_restui_sub: '“Restored / Not restored” blocks and a counter in the list',
       set_g_look: 'Appearance', set_g_list: 'List', set_g_sec: 'Security', set_g_data: 'Data', set_g_about: 'About',
       st_scanned_lbl: 'scanned', trash_restore_all: 'Restore all', sel_edit: 'Edit', card_prev: 'Previous record', card_next: 'Next record', trash_sel: 'Selected: {n}', theme_switch: 'Switch theme' },
@@ -35,7 +36,7 @@ Object.assign(IC, {
 async function openMenu() {
   if ($('.drawer')) return;
   const trashN = DB.records.filter(r => r.del && !r.purged).length, total = counts().total;
-  const items = [['books', 'nav_books', 'all', fmtInt(total)], ['trash', 'nav_trash', 'trashn', trashN ? String(trashN) : ''], ['reports', 'nav_reports', 'report', ''], ['stats', 'nav_stats', 'stats', ''], ['columns', 'nav_columns', 'cols', ''], ['ie', 'nav_import', 'imp', ''], ['sync', 'nav_sync', 'sync', ''], ['settings', 'nav_settings', 'gear', '']];
+  const items = [['books', 'nav_books', 'all', fmtInt(total)], ['trash', 'nav_trash', 'trashn', trashN ? String(trashN) : ''], ['reports', 'nav_reports', 'report', ''], ['stats', 'nav_stats', 'stats', ''], ['columns', 'nav_columns', 'cols', ''], ['ie', 'nav_import', 'imp', ''], ['backup', 'nav_backup', 'backup', ''], ['sync', 'nav_sync', 'sync', ''], ['settings', 'nav_settings', 'gear', '']];
   const wrap = document.createElement('div'); wrap.className = 'drawerwrap';
   wrap.innerHTML = `<div class="dscrim"></div><aside class="drawer" role="dialog" aria-label="${esc(t('menu_btn'))}">
     <div class="dhead"><img src="icon.svg" alt="" width="44" height="44"><b>Gazna</b><button class="themebtn" id="dTheme" aria-label="${esc(t('theme_switch'))}">${H.theme === 'dark' ? IC.sun : IC.moon}</button></div>
@@ -88,7 +89,7 @@ async function colFilterList() {
   window.loadSavedUi = function () {
     try {
       const o = JSON.parse(localStorage.getItem(KEY) || 'null'); if (!o || Date.now() - (o.ts || 0) > 7 * 86400000) return null;
-      if (!['books', 'stats', 'reports', 'trash', 'columns', 'settings', 'ie', 'sync'].includes(o.route)) o.route = 'books';
+      if (!['books', 'stats', 'reports', 'trash', 'columns', 'settings', 'ie', 'backup', 'sync'].includes(o.route)) o.route = 'books';
       if (!['all', 'scanned', 'not', 'rest', 'notrest', 'recent', 'pin'].includes(o.filter)) o.filter = 'all';
       if (o.filter === 'scanned' || o.filter === 'not') { if (H.scan === false || H.scanUi === false) o.filter = 'all'; }
       if ((o.filter === 'rest' || o.filter === 'notrest') && !(H.rest && H.restUi)) o.filter = 'all';
