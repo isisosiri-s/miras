@@ -246,7 +246,8 @@ async function showLock() {
     if (!p) return;
     const r = await Auth.unlock(p); if (r.ok) { clearInterval(_lockTimer); afterUnlock(); } else { await Native.bioClear(); H.bio = false; await saveHeader(); showLock(); }
   };
-  if (bioOk && Date.now() - (UI.lastAutoBio || 0) > 4000) { UI.lastAutoBio = Date.now(); setTimeout(() => $('#bio') && $('#bio').click(), 350); }
+  // the fingerprint prompt may only start while the app is on screen: started in the background it pulls the whole app back to the front
+  if (bioOk && Date.now() - (UI.lastAutoBio || 0) > 4000) { UI.lastAutoBio = Date.now(); UI.bioPending = true; setTimeout(autoBio, 350); }
 }
 function showSetup() {
   const el = appEl();
@@ -351,28 +352,13 @@ function renderRoute() {
   UI.selMode = UI.selMode && UI.route === 'books';
   (views[UI.route] || viewBooks)(main);
 }
-function mobBar(title, withBack) {
-  if (withBack) return `<div class="appbar mob back"><button class="ib" id="mbBack">${IC.back}</button><h2>${esc(title)}</h2></div>`;
-  return `<div class="appbar mob"><h2>${esc(title)}</h2><button class="lchip" id="mbLang">${H.lang.toUpperCase()}</button><button class="ib" id="mbSync">${IC.sync}</button><button class="ib" id="mbMenu">${IC.menu}</button></div>`;
+function mobBar(title) { // every screen but the list: burger (opens the menu) + title
+  return `<div class="appbar mob back"><button class="ib" id="mbBack" aria-label="${esc(t('menu_btn'))}">${IC.menu}</button><h2>${esc(title)}</h2></div>`;
 }
 function bindMobBar() {
-  const b = $('#mbBack'); if (b) b.onclick = () => history.back();
-  const l = $('#mbLang'); if (l) l.onclick = () => setLang(H.lang === 'ru' ? 'tk' : H.lang === 'tk' ? 'en' : 'ru');
-  const s = $('#mbSync'); if (s) s.onclick = () => goRoute('sync');
-  const m = $('#mbMenu'); if (m) m.onclick = openMenu;
+  const b = $('#mbBack'); if (b) b.onclick = () => openMenu();
+  const m = $('#mbMenu'); if (m) m.onclick = () => openMenu();
 }
-async function openMenu() {
-  const items = [['stats', 'nav_stats'], ['reports', 'nav_reports'], ['trash', 'nav_trash'], ['columns', 'nav_columns'], ['ie', 'nav_import'], ['sync', 'nav_sync'], ['settings', 'nav_settings']];
-  const html = items.map(([k, lab]) => `<button class="setrow" data-go="${k}"><span class="tt">${t(lab)}</span><span class="chev">${IC.chev}</span></button>`).join('') +
-    `<button class="setrow" data-go="__sel"><span class="tt">${t('menu_select')}</span></button>${Auth.hasPin() ? `<button class="setrow" data-go="__lock"><span class="tt">${t('nav_lock')}</span></button>` : ''}`;
-  const p = ask({ html: `<div class="group" style="margin:0">${html}</div>`, buttons: [{ label: t('close'), v: null, cls: 'b2' }] });
-  setTimeout(() => $$('.mb [data-go]').forEach(b => b.onclick = () => {
-    const mb = b.closest('.mb'); const k = b.dataset.go; mb.querySelector('.btn').click();
-    setTimeout(() => { if (k === '__sel') enterSelMode(); else if (k === '__lock') doLock(); else goRoute(k); }, 30);
-  }), 20);
-  await p;
-}
-
 // ---------- books list ----------
 function tableCols() {
   const vis = visibleCols();
@@ -431,14 +417,17 @@ function computeList() {
 }
 function viewBooks(main) {
   main.classList.remove('hdrhide');
-  main.innerHTML = `${mobBar('Gazna')}
-  <div class="toolbar"><div class="trow"><div class="search">${IC.search}<input id="q" type="search" placeholder="${esc(t('search_ph'))}" value="${esc(UI.q)}" autocomplete="off"></div>
+  main.innerHTML = `<div class="toolbar"><div class="trow">
+    <button class="ib tbmenu only-narrow" id="mbMenu" aria-label="${esc(t('menu_btn'))}">${IC.menu}</button>
+    <div class="search">${IC.search}<input id="q" type="search" placeholder="${esc(t('search_ph'))}" value="${esc(UI.q)}" autocomplete="off"><span class="fchip hidden" id="fchip"><button id="fchipB" type="button"></button><button id="fchipX" type="button" aria-label="${esc(t('flt_reset'))}">${IC.close}</button></span></div>
+    <button class="ib tbbtn" id="tbRec" aria-label="${esc(t('f_recent'))}">${IC.recent}</button><button class="ib tbbtn tbpin hidden" id="tbPin" aria-label="${esc(t('f_pinned'))}">${IC.lamp(22)}</button>
     <button class="sbtn only-wide" id="bImp">${IC.imp}${t('btn_import')}</button><button class="sbtn only-wide" id="bExp">${IC.imp.replace('M12 3v12M7 10l5 5 5-5', 'M12 15V3M7 8l5-5 5 5')}${t('btn_export')}</button><button class="sbtn pri only-wide" id="bNew">${IC.plus.replace('width="26" height="26"', 'width="18" height="18"')}${t('btn_new')}</button></div>
-    <div class="chips" id="chips"></div></div>
-  <div id="banner"></div><div class="counter" id="counter"></div><div class="prog"><i id="prog"></i></div>
+    <div class="tiles" id="chips"></div></div>
+  <div id="banner"></div><div class="counter hidden" id="counter"></div>
   <div class="selbar hidden" id="selbar"></div>
   <div class="tablewrap" id="tw"><div class="th" id="th"></div><div id="rows"></div></div>
-  <div class="srail" id="srail"><div class="sthumb" id="sthumb"></div></div>
+  <div class="srail" id="srail"><div class="sbub" id="sbub"></div><div class="sthumb" id="sthumb"></div></div>
+  <button class="jmpbtn hidden" id="jmpbtn" aria-label="${esc(t('go_top'))}">${IC.up}</button>
   <button class="fab only-narrow" id="fab" aria-label="${esc(t('btn_new'))}">${IC.plus}</button>`;
   bindMobBar();
   const q = $('#q');
@@ -446,6 +435,10 @@ function viewBooks(main) {
   $('#bNew').onclick = () => addRecord(); $('#fab').onclick = () => addRecord();
   $('#bImp').onclick = () => startImport(); $('#bExp').onclick = () => goRoute('ie');
   renderChips();
+  $('#tbRec').onclick = () => { UI.filter = UI.filter === 'recent' ? 'all' : 'recent'; renderChips(); refreshList(); const w = $('#tw'); if (w) w.scrollTop = 0; };
+  $('#tbPin').onclick = () => { UI.filter = UI.filter === 'pin' ? 'all' : 'pin'; renderChips(); refreshList(); const w = $('#tw'); if (w) w.scrollTop = 0; };
+  $('#fchipX').onclick = () => { UI.colf = {}; renderChips(); refreshList(); };
+  $('#fchipB').onclick = () => colFilterList();
   $('#tw').addEventListener('scroll', onListScroll, { passive: true }); bindResize(); bindRail();
   const rows = $('#rows');
   rows.addEventListener('click', onRowClick);
@@ -467,16 +460,39 @@ function viewBooks(main) {
   $('#tw').addEventListener('click', e => { if (UI.card && isWide() && !e.target.closest('.tr,.th')) closeCard(false); });
   if (UI.firstPaint) { UI.firstPaint = false; requestAnimationFrame(() => setTimeout(() => { if ($('#rows')) refreshList(); }, 0)); } else refreshList();
 }
+function tileCounts() {
+  const hasQ = norm(UI.q).trim() || Object.keys(UI.colf || {}).length;
+  if (!hasQ) { const c = counts(); return { all: c.total, scanned: c.scanned, not: c.total - c.scanned, rest: c.rest, notrest: c.total - c.rest }; }
+  const key = `${DB.rev}|${UI.q}|${Object.keys(UI.colf).map(k => k + ':' + UI.colf[k].join('\u0001')).join('|')}`;
+  if (UI._tcKey === key) return UI._tc;
+  const toks = norm(UI.q).split(' ').filter(Boolean), cf = UI.colf || {}, cks = Object.keys(cf).map(k => [colDef(k), new Set(cf[k])]).filter(x => x[0]);
+  const o = { all: 0, scanned: 0, not: 0, rest: 0, notrest: 0 };
+  for (const r of DB.records) {
+    if (!isLive(r)) continue;
+    if (toks.length) { const sk = searchKey(r); if (!toks.every(x => sk.includes(x))) continue; }
+    if (cks.length && !cks.every(([c, set]) => set.has(cellVal(c, r)))) continue;
+    o.all++; if (r.scanned) o.scanned++; else o.not++; if (r.restored) o.rest++; else o.notrest++;
+  }
+  UI._tcKey = key; UI._tc = o; return o;
+}
+const scanUiOn = () => H.scan !== false && H.scanUi !== false;
 function renderChips() {
   const c = $('#chips'); if (!c) return;
-  const rf = H.rest && H.restUi, nf = Object.keys(UI.colf || {}).length;
-  c.innerHTML = [['all', t('f_all')], ['scanned', IC.ok(14) + t('f_scanned')], ['not', IC.off(14) + t('f_notscanned')], ...(rf ? [['rest', IC.ok(14) + t('f_rest')], ['notrest', IC.off(14) + t('f_notrest')]] : []), ['recent', t('f_recent')], ...((UI.filter === 'pin' || DB.records.some(r => r.pin && isLive(r))) ? [['pin', IC.lamp(14) + t('f_pinned')]] : [])].map(([k, l]) => `<button class="chip ${UI.filter === k ? 'on' : ''}" data-f="${k}">${l}</button>`).join('') + (nf ? `<button class="chip clr" data-f="__clr">${IC.no(14)}${t('f_clear_cols', { n: nf })}</button>` : '');
-  $$('.chip', c).forEach(b => b.onclick = () => { if (b.dataset.f === '__clr') UI.colf = {}; else UI.filter = b.dataset.f; renderChips(); refreshList(); const w = $('#tw'); if (w) w.scrollTop = 0; });
+  const rf = H.rest && H.restUi, sc = scanUiOn(), n = tileCounts();
+  const T = (k, lab) => `<button class="ftile ${UI.filter === k ? 'on' : ''}" data-f="${k}"><b class="tn">${fmtInt(n[k])}</b><span class="tl">${esc(lab)}</span></button>`;
+  c.className = 'tiles' + (rf ? ' two' : '') + (!sc && !rf ? ' one' : '');
+  c.innerHTML = `<div class="trw">${T('all', t('f_all'))}${sc ? T('scanned', t('f_scanned')) + T('not', t('f_notscanned')) : ''}</div>` + (rf ? `<div class="trw r2">${T('rest', t('f_rest'))}${T('notrest', t('f_notrest'))}</div>` : '');
+  $$('.ftile', c).forEach(b => b.onclick = () => { UI.filter = b.dataset.f; renderChips(); refreshList(); const w = $('#tw'); if (w) w.scrollTop = 0; });
+  const nf = Object.keys(UI.colf || {}).length, fc = $('#fchip');
+  if (fc) { fc.classList.toggle('hidden', !nf); $('#fchipB').innerHTML = IC.funnel + '<b>' + nf + '</b>'; }
+  const rec = $('#tbRec'), pn = $('#tbPin'), hasPin = UI.filter === 'pin' || DB.records.some(r => r.pin && isLive(r));
+  if (rec) rec.classList.toggle('on', UI.filter === 'recent');
+  if (pn) { pn.classList.toggle('hidden', !hasPin); pn.classList.toggle('on', UI.filter === 'pin'); }
 }
 function rowHtml(r, cols, tpl) {
   const sel = UI.sel.has(r.uuid);
   const SL = stickyLefts(cols);
-  const cb = (isWide() || UI.selMode) ? `<span class="cbc${stk(SL, 'cb')}" data-cb="1"><b class="cb ${sel ? 'on' : ''}">${sel ? IC.ok(14, '#fff') : ''}</b></span>` : '';
+  const cb = (isWide() || UI.selMode) ? `<span class="cbc${stk(SL, 'cb')}" data-cb="1"><b class="cb ${sel ? 'on' : ''}">${sel ? IC.ok(14, 'currentColor') : ''}</b></span>` : '';
   const cells = cols.map(c => {
     if (c.kind === 'id') return `<span class="idc${stk(SL, 'id')}"><i>${r.id}</i></span>`;
     if (c.kind === 'check') return `<span class="mid">${r[c.key] ? IC.ok(20) : IC.off(20)}</span>`;
@@ -548,53 +564,56 @@ function onListScroll() {
         if (dt > 34) { v.slowN = (v.slowN || 0) + 1; if (v.slowN >= 6 && !document.documentElement.classList.contains('slow')) document.documentElement.classList.add('slow'); } else v.slowN = Math.max(0, (v.slowN || 0) - 1);
       }
       v.lastT = now; v.lastTop = tw0.scrollTop; v.slowN = v.slowN || 0;
-      if (animLevel() >= 2) { // the + button steps aside while scrolling down, comes back when scrolling up or after a pause
-        const f = $('.fab'), st = tw0.scrollTop, d = st - (v.fabTop || 0);
-        if (f && Math.abs(d) > 10) { f.classList.toggle('fabhide', d > 0 && st > 160); v.fabTop = st; }
-      }
       clearTimeout(v.idleT); v.idleT = setTimeout(() => { v.lastT = 0; setBuf(0); if ($('#rows')) renderWindow('idle'); }, 140);
-      clearTimeout(v.fabT); v.fabT = setTimeout(() => { const fb = $('.fab'); if (fb) fb.classList.remove('fabhide'); }, 1000);
     }
     v.raf = 0;
     const tw = $('#tw');
-    // phone in landscape: header, search, chips, banner and counter fold away while the list is scrolled
-    if (tw && matchMedia(LAND_SHORT).matches) {
-      const p = tw.parentElement, hid = p.classList.contains('hdrhide'), st = tw.scrollTop;
-      // one layout change per fold/unfold (no per-frame animation of heights); keep the visible rows anchored
-      if (!hid && st > 24) { p.classList.add('hdrhide'); v.from = -1; flipHdr(p); }
-      else if (hid && st < 4) { p.classList.remove('hdrhide'); v.from = -1; flipHdr(p); }
-    }
-    renderWindow(false); updateRail();
+    renderWindow(false); updateRail(); jmpScroll();
   });
 }
-// ---- right-hand scroll slider (touch screens) + jump buttons ----
+// ---- right-hand scroll slider (touch screens): thin at rest, fat + bubble "№ N" while held; one round jump button ----
 const railOn = () => matchMedia('(pointer:coarse)').matches;
+const RAIL_TH = 52;
 function updateRail() {
   const tw = $('#tw'), r = $('#srail'), th = $('#sthumb'); if (!tw || !r) return;
   const max = tw.scrollHeight - tw.clientHeight;
   const show = railOn() && max > tw.clientHeight * 1.5;
   r.style.display = show ? 'block' : 'none'; if (!show) return;
-  const hh = ($('#th') || {}).offsetHeight || 38, rh = tw.clientHeight - hh, thH = 48;
+  const fb = $('.fab'), fabH = fb && getComputedStyle(fb).display !== 'none' && !fb.classList.contains('hidden') ? 84 : 0; // the track stops above the + button
+  const hh = ($('#th') || {}).offsetHeight || 38, rh = tw.clientHeight - hh - fabH;
   r.style.top = (tw.offsetTop + hh) + 'px'; r.style.height = rh + 'px';
-  th.style.height = thH + 'px'; th.style.transform = `translateY(${Math.max(0, Math.min(1, tw.scrollTop / max)) * (rh - thH)}px)`;
+  const k = Math.max(0, Math.min(1, tw.scrollTop / max));
+  th.style.height = RAIL_TH + 'px'; th.style.transform = `translateY(${k * (rh - RAIL_TH)}px)`;
+  const bub = $('#sbub'); if (bub) bub.style.transform = `translateY(${k * (rh - RAIL_TH) + RAIL_TH / 2 - 17}px)`;
+  if (r.classList.contains('on') && bub) { const n = UI.list.length, i = Math.min(n, Math.max(1, Math.round(k * (n - 1)) + 1)); bub.textContent = '№ ' + fmtInt(i); }
 }
 function bindRail() {
   const tw = $('#tw'), r = $('#srail'); if (!tw || !r) return;
   const go = e => {
-    const b = r.getBoundingClientRect(), thH = 48, max = tw.scrollHeight - tw.clientHeight;
-    tw.scrollTop = Math.max(0, Math.min(1, (e.clientY - b.top - thH / 2) / (b.height - thH))) * max;
+    const b = r.getBoundingClientRect(), max = tw.scrollHeight - tw.clientHeight;
+    const k = Math.max(0, Math.min(1, (e.clientY - b.top - RAIL_TH / 2) / (b.height - RAIL_TH)));
+    setBuf(40); tw.scrollTop = k * max; renderWindow(false); updateRail(); // draw the rows right now: no blank frames under the finger
   };
   r.addEventListener('pointerdown', e => { e.preventDefault(); r.setPointerCapture(e.pointerId); r.classList.add('on'); go(e); });
   r.addEventListener('pointermove', e => { if (r.classList.contains('on')) go(e); });
-  const up = () => r.classList.remove('on'); r.addEventListener('pointerup', up); r.addEventListener('pointercancel', up);
-  const c = $('#counter');
-  if (c) c.addEventListener('click', e => {
-    const j = e.target.closest('[data-jump]'); if (!j) return;
-    tw.scrollTop = j.dataset.jump === 'end' ? tw.scrollHeight : 0;
-  });
+  const up = () => { r.classList.remove('on'); setBuf(0); updateRail(); }; r.addEventListener('pointerup', up); r.addEventListener('pointercancel', up);
+  const jb = $('#jmpbtn');
+  if (jb) jb.onclick = () => { const mx = tw.scrollHeight - tw.clientHeight; tw.scrollTop = jb.dataset.dir === 'up' ? 0 : mx; jb.classList.remove('on'); };
   window.addEventListener('resize', updateRail);
-  // after the header folds/unfolds the list area changes height: redraw the visible rows
 }
+// the jump button: scrolling down shows ↑ (to the start), scrolling up shows ↓ (to the end); gone after ~2 s idle and at the ends of the list
+const JM = { last: 0, dir: 0, t: 0 };
+function jmpScroll() {
+  const tw = $('#tw'), b = $('#jmpbtn'); if (!tw || !b) return;
+  const st = tw.scrollTop, mx = tw.scrollHeight - tw.clientHeight, h = tw.clientHeight, d = st - JM.last;
+  if (Math.abs(d) > 4) { JM.dir = d > 0 ? 1 : -1; JM.last = st; }
+  const long = mx > h * 1.5;
+  const show = long && ((JM.dir > 0 && st > h * 0.7) || (JM.dir < 0 && st < mx - h * 0.7));
+  if (b.dataset.dir !== (JM.dir > 0 ? 'up' : 'down')) { b.dataset.dir = JM.dir > 0 ? 'up' : 'down'; b.innerHTML = JM.dir > 0 ? IC.up : IC.down; b.setAttribute('aria-label', t(JM.dir > 0 ? 'go_top' : 'go_end')); }
+  b.classList.remove('hidden'); b.classList.toggle('on', show);
+  clearTimeout(JM.t); if (show) JM.t = setTimeout(() => b.classList.remove('on'), 2000);
+}
+function jmpUpdate() { const b = $('#jmpbtn'), tw = $('#tw'); if (!b || !tw) return; if (tw.scrollHeight - tw.clientHeight < tw.clientHeight * 1.5) b.classList.remove('on'); }
 
 // ---- column header menu: sort, filter, auto width, hide ----
 function setSort(key, dir) { UI.sort = dir ? { key, dir } : null; H.sort = UI.sort ? { ...UI.sort } : null; saveHeader(); refreshList(); } // the chosen order is a setting of THIS device (not synced)
@@ -666,11 +685,8 @@ function refreshList() {
   { const k = list.length + ':' + (list[0] && list[0].uuid); if (k !== UI._lk) { UI._lk = k; rows.classList.remove('listin'); void rows.offsetWidth; rows.classList.add('listin'); clearTimeout(UI._lkT); UI._lkT = setTimeout(() => rows.classList.remove('listin'), animLevel() >= 3 ? 800 : 320); } }
   renderCounter(list, total); renderBanner(total); renderSelbar(); updateRail();
 }
-function renderCounter(list, total) {
-  const c = $('#counter'); if (!c) return;
-  const found = (UI.q || UI.filter !== 'all') ? ` · ${t('list_found', { n: `<b>${fmtInt(list.length)}</b>` })}` : '';
-  c.innerHTML = `<span>${t('list_total')}: <b>${fmtInt(total.total)}</b></span><span>· ${t('list_scanned')}: <b>${fmtInt(total.scanned)}</b></span>${H.rest && H.restUi ? `<span>· ${t('list_rest')}: <b>${fmtInt(total.rest)}</b></span>` : ''}${found}<span class="pct">${fmtPct(total.scanned, total.total)}</span>${list.length > 40 ? `<span class="jmpcol"><button class="jmp" data-jump="top">${esc(t('go_top'))}</button><button class="jmp" data-jump="end">${esc(t('go_end'))}</button></span>` : ''}`;
-  $('#prog').style.width = (total.total ? total.scanned / total.total * 100 : 0) + '%';
+function renderCounter(list, total) { // the numbers live on the filter tiles now
+  renderChips(); jmpUpdate();
 }
 function renderBanner(total) {
   const b = $('#banner'); if (!b) return;
@@ -921,9 +937,10 @@ async function openCard(uuid, draftVals, silentRerender, presetType) {
     }
     return `<div class="fld ${half ? 'half' : ''}">${inner}</div>`;
   }).join('');
-  host.innerHTML = `<div class="cardhead"><button class="ib backb" id="cBack">${IC.back}</button><h3 id="cTitle">${cardTitleOf(isNew, vals.type)}</h3>${!isNew ? `<button class="ib lamp${rec && rec.pin ? ' on' : ''}" id="cPin" aria-pressed="${rec && rec.pin ? 'true' : 'false'}" aria-label="${esc(t(rec && rec.pin ? 'pin_off' : 'pin_on'))}">${IC.lamp(22)}</button><button class="ib" id="cDel" aria-label="${esc(t('btn_delete'))}">${IC.trash}</button>` : ''}<button class="ib only-wide" id="cX" aria-label="${esc(t('close'))}">${IC.close}</button></div>
+  host.innerHTML = `<div class="cardhead"><button class="ib backb" id="cBack">${IC.close}</button><h3 id="cTitle">${cardTitleOf(isNew, vals.type)}</h3>${!isNew ? `<button class="ib lamp${rec && rec.pin ? ' on' : ''}" id="cPin" aria-pressed="${rec && rec.pin ? 'true' : 'false'}" aria-label="${esc(t(rec && rec.pin ? 'pin_off' : 'pin_on'))}">${IC.lamp(22)}</button><button class="ib" id="cDel" aria-label="${esc(t('btn_delete'))}">${IC.trash}</button>` : ''}<button class="ib only-wide" id="cX" aria-label="${esc(t('close'))}">${IC.close}</button></div>
     <div class="cardbody" id="cBody">${body}<div class="warn hidden" id="dupWarn">${IC.warn}<span></span></div>${isNew ? '' : cardRepsHtml(rec)}</div>
-    <div class="actions"><!-- no Cancel: the back arrow (and X on PC) already leaves the card -->${isNew ? `<button class="btn b2" id="cNext">${t('card_save_next')}</button>` : ''}<button class="btn b1" id="cSave">${t('btn_save')}</button></div>`;
+    <div class="actions${isNew ? '' : ' nav'}"><!-- no Cancel: the cross (and X on PC) already leaves the card -->${isNew ? `<button class="btn b2" id="cNext">${t('card_save_next')}</button>` : `<button class="navb" id="cPrev" aria-label="${esc(t('card_prev'))}">${IC.prev}</button>`}<button class="btn b1" id="cSave">${t('btn_save')}</button>${isNew ? '' : `<button class="navb" id="cNxt" aria-label="${esc(t('card_next'))}">${IC.next}</button>`}</div>`;
+  if (!wasOpen && window.cardSheetReset) cardSheetReset(host);
   host.classList.add('on'); $('#shell').classList.add('hascard');
   bindCheckButtons(host); bindCombos(host); bindCardReps(host);
   UI.card.init = JSON.stringify(readCard());
@@ -934,6 +951,7 @@ async function openCard(uuid, draftVals, silentRerender, presetType) {
   $('#cBack').onclick = () => history.back();
   $('#cX').onclick = () => closeCard(false);
   $('#cSave').onclick = () => saveCard(false);
+  if ($('#cPrev')) { $('#cPrev').onclick = () => cardNav(-1); $('#cNxt').onclick = () => cardNav(1); updateCardNav(); }
   if ($('#cNext')) $('#cNext').onclick = () => saveCard(true);
   if ($('#cDel')) $('#cDel').onclick = async () => { if (await confirmDlg(t('card_del_confirm'), t('btn_delete'), true)) { const r = UI.card.rec; closeCard(true); trashRecords([r]); toast(t('toast_trashed', { n: 1 })); refreshList(); } };
   let dt; host.addEventListener('input', () => { clearTimeout(dt); dt = setTimeout(checkDups, 250); });
@@ -1070,4 +1088,16 @@ async function doLock() {
   UI.card = null; UI.sel.clear(); UI.selMode = false; UI.route = 'books'; UI.q = ''; UI.filter = 'all'; UI.colf = {}; UI.listKey = ''; UI.layers = []; UI.routeLayer = null;
   document.querySelectorAll('.mb').forEach(e => e.remove());
   showLock();
+}
+
+function autoBio() { if (document.hidden) return; UI.bioPending = false; const b = $('#bio'); if (b) b.click(); }
+document.addEventListener('visibilitychange', () => { if (!document.hidden && UI.bioPending) setTimeout(autoBio, 350); });
+
+// previous / next record of the list the card was opened from (same search, filters and order)
+function cardNeighbour(dir) { if (!UI.card || UI.card.isNew) return null; const l = computeList(), i = l.findIndex(r => r.uuid === UI.card.uuid); const r = i < 0 ? null : l[i + dir]; return r || null; }
+function updateCardNav() { const p = $('#cPrev'), n = $('#cNxt'); if (p) p.classList.toggle('dis', !cardNeighbour(-1)); if (n) n.classList.toggle('dis', !cardNeighbour(1)); }
+async function cardNav(dir) {
+  const r = cardNeighbour(dir); if (!r) return;
+  await openCard(r.uuid); // asks "save changes?" itself when the card was edited
+  if (UI.card && UI.card.uuid === r.uuid) { const l = computeList(), i = l.findIndex(x => x.uuid === r.uuid); if (i >= 0 && UI.route === 'books') scrollToIndex(i, false); const b = $('#cBody'); if (b) b.scrollTop = 0; }
 }

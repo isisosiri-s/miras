@@ -373,7 +373,7 @@ function repPickHtml(R, m) {
     const here = repHere(m, r.inv), where = here ? `${repMonthName(m.m)}` : repWhere(r.inv, m);
     const note = where ? ` · ${esc(t('rep_in_report', { m: where }))}` : '';
     return `<div class="rp-pr${R.sel.has(r.uuid) ? ' on' : ''}" data-u="${r.uuid}"><span class="chk${R.sel.has(r.uuid) ? ' on' : ''}">✓</span><span class="bd ${repBadge(r.type)}">${esc(repKindLabel(r.type || 'manuscript').slice(0, 5).toUpperCase())}</span><div class="rp-t"><b>${esc(r.title || '–')}</b><span>${esc(t('rep_inv'))} ${esc(r.inv)} · ${r.pages !== '' && r.pages != null ? esc(fmtNum(repLeavesOf(r.pages))) : '–'} ${esc(t('rep_leaves').toLowerCase())}${note}</span></div><span class="sc ${r.scanned ? 'y' : 'n'}">✓</span></div>`;
-  }).join('') + `<div class="rp-hint">${esc(t('rep_hint_pick'))}</div>`;
+  }).join('') ;
 }
 function repViewPick(main, f, m) {
   const R = UI.rep.pick;

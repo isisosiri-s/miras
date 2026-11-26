@@ -20,8 +20,14 @@ function viewStats(main) {
   const row = (...cs) => `<div style="display:flex;gap:10px;margin:10px 12px 0">${cs.join('')}</div>`;
   const types = ['manuscript', 'printed'].map(k => [t('type_' + k), live.filter(r => r.type === k).length]).filter(x => x[1]);
   const noType = live.filter(r => !r.type).length; if (noType) types.push([t('st_notype'), noType]);
-  const body = `${row(card(t('st_total'), c.total, '', true))}
-    ${row(card(t('st_scanned'), c.scanned, pct(c.scanned)), card(t('st_notscanned'), c.total - c.scanned, pct(c.total - c.scanned)))}
+  const sc = H.scan !== false;
+  const ring = () => { // the share of scanned records: a big ring, symmetric: ring in the middle, two equal columns under it
+    const p = c.total ? c.scanned / c.total : 0, R = 60, L = 2 * Math.PI * R, pc = (p * 100).toFixed(1).replace('.', LANG === 'en' ? '.' : ',');
+    return `<div class="string"><div class="rg"><svg width="152" height="152" viewBox="0 0 152 152"><circle cx="76" cy="76" r="${R}" class="trk"/><circle cx="76" cy="76" r="${R}" class="arc" stroke-dasharray="${L}" stroke-dashoffset="${L * (1 - p)}"/></svg><div class="mid"><b>${pc}%</b><span>${esc(t('st_scanned_lbl'))}</span></div></div>
+    <div class="two"><div><span>${esc(t('st_total'))}</span><b class="cu">${c.total}</b></div><i></i><div><span>${esc(t('st_scanned'))}</span><b class="cu">${c.scanned}</b></div></div></div>`;
+  };
+  const body = `${sc ? ring() : row(card(t('st_total'), c.total, '', true))}
+    ${sc ? row(card(t('st_scanned'), c.scanned, pct(c.scanned)), card(t('st_notscanned'), c.total - c.scanned, pct(c.total - c.scanned))) : ''}
     ${H.rest ? row(card(t('st_rest'), c.rest, pct(c.rest)), card(t('st_notrest'), c.total - c.rest, pct(c.total - c.rest))) : ''}
     ${row(card(t('st_pages'), fmtNum(pages)), card(t('st_trash'), DB.records.filter(r => r.del && !r.purged).length))}
     ${statsBlock(t('st_types'), types, c.total)}${statsBlock(t('st_langs'), statsTop('lang', 10), c.total)}${statsBlock(t('st_locs'), statsTop('loc', 10), c.total)}${statsBlock(t('st_authors'), statsTop('author', 10), c.total)}`;

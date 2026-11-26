@@ -114,32 +114,54 @@
     });
   };
 
-  // ---- phone: drag the card header down to close it (levels 2 and 3) ----
-  let sw = null;
+  // ---- phone: the card is a sheet. Swipe down: full -> half; swipe up on half: back to full; swipe down on half: closes.
+  //      Works anywhere in the card except on fields/buttons; a scrolled card scrolls first (the sheet only moves from the top). Editing works on half.
+  const HALF = 0.46; let g = null;
+  const sheetOk = () => !isWide() && window.matchMedia('(max-width:899px)').matches;
+  const topOf = s => (s === 'half' ? Math.round(window.innerHeight * HALF) : 0);
+  const cardHost = () => { const h = $('#cardhost'); return h && h.classList.contains('on') ? h : null; };
+  const setTop = (h, px, anim) => { h.style.transition = anim && animLevel() >= 2 ? 'top .24s cubic-bezier(.2,.8,.2,1)' : 'none'; h.style.top = px + 'px'; };
+  const toState = (h, s, anim = true) => { h.dataset.sheet = s; h.style.borderRadius = s === 'half' ? '18px 18px 0 0' : ''; setTop(h, topOf(s), anim); };
+  window.cardSheetReset = h => { h = h || $('#cardhost'); if (!h) return; h.style.top = ''; h.style.transition = ''; h.style.borderRadius = ''; delete h.dataset.sheet; };
   document.addEventListener('touchstart', e => {
-    if (isWide() || animLevel() < 2 || e.touches.length !== 1) return;
-    const hd = e.target.closest && e.target.closest('#cardhost .cardhead'); if (!hd || e.target.closest('button,input,select,textarea')) return;
-    const host = $('#cardhost'); if (!host || !host.classList.contains('on')) return;
-    sw = { y: e.touches[0].clientY, t: performance.now(), host, dy: 0 };
+    g = null; if (!sheetOk() || e.touches.length !== 1) return;
+    const h = cardHost(); if (!h || !h.contains(e.target)) return;
+    if (e.target.closest('input,select,textarea,button,.dd,.dd-btn,.dd-list,[contenteditable]')) return;
+    const body = e.target.closest('#cBody');
+    g = { y: e.touches[0].clientY, x: e.touches[0].clientX, t: performance.now(), h, mode: null, dy: 0, start: h.dataset.sheet === 'half' ? 'half' : 'full', bodyTop: body ? body.scrollTop : 0, body };
   }, { passive: true });
   document.addEventListener('touchmove', e => {
-    if (!sw) return; const dy = e.touches[0].clientY - sw.y; sw.dy = Math.max(0, dy);
-    sw.host.style.transition = 'none'; sw.host.style.animation = 'none'; sw.host.style.transform = 'translateY(' + sw.dy + 'px)';
-  }, { passive: true });
-  const swEnd = async () => {
-    if (!sw) return; const s = sw; sw = null; const h = s.host, v = s.dy / Math.max(1, performance.now() - s.t);
-    h.style.transition = 'transform .2s cubic-bezier(.2,.8,.2,1)';
-    if (s.dy > 110 || (s.dy > 50 && v > 0.6)) {
-      h.style.transform = 'translateY(100%)'; h.dataset.swiped = '1';
-      await new Promise(r => setTimeout(r, 200));
+    if (!g) return; const y = e.touches[0].clientY, dy = y - g.y, dx = e.touches[0].clientX - g.x;
+    if (!g.mode) {
+      if (Math.abs(dy) < 8 && Math.abs(dx) < 8) return;
+      if (Math.abs(dx) > Math.abs(dy)) { g = null; return; }
+      const atTop = !g.body || g.body.scrollTop <= 0;
+      // down: only from the top of the card; up: only on the half sheet (on the full card up is just scrolling)
+      if ((dy > 0 && atTop) || (dy < 0 && g.start === 'half')) { g.mode = 'sheet'; g.h.style.animation = 'none'; g.base = topOf(g.start); g.y0 = y; } else { g = null; return; }
+    }
+    e.preventDefault(); g.dy = y - g.y0;
+    const top = Math.max(0, Math.min(window.innerHeight, g.base + g.dy)); setTop(g.h, top, false); g.top = top;
+  }, { passive: false });
+  const end = async () => {
+    if (!g || g.mode !== 'sheet') { g = null; return; } const s = g; g = null; const h = s.h, dy = s.dy, v = dy / Math.max(1, performance.now() - s.t);
+    if (s.start === 'full') { if (dy > 70 || (dy > 30 && v > 0.5)) toState(h, 'half'); else toState(h, 'full'); return; }
+    if (dy < -50 || (dy < -25 && v < -0.5)) { toState(h, 'full'); return; }
+    if (dy > 70 || (dy > 30 && v > 0.5)) {
+      if (cardDirty()) { toState(h, 'half'); const ok = await closeCard(false); if (ok) setTimeout(() => { cardSheetReset(h); h.style.animation = ''; }, 260); return; } // edited: ask first, with the sheet still on screen
+      setTop(h, window.innerHeight, true); h.dataset.swiped = '1';
+      await new Promise(r => setTimeout(r, animLevel() >= 2 ? 240 : 0));
       const ok = await closeCard(false);
       delete h.dataset.swiped;
-      if (!ok) { h.style.transition = 'transform .2s'; h.style.transform = ''; setTimeout(() => { h.style.transition = ''; }, 220); } // inline animation:none stays until the card closes (restarting the slide-in would jump)
-      else { h.style.transition = ''; h.style.transform = ''; h.style.animation = ''; }
-    } else { h.style.transform = ''; setTimeout(() => { h.style.transition = ''; }, 220); }
+      if (!ok) { toState(h, 'half'); h.style.animation = 'none'; } else { cardSheetReset(h); h.style.animation = ''; }
+      return;
+    }
+    toState(h, 'half');
   };
-  document.addEventListener('touchend', swEnd, { passive: true });
-  document.addEventListener('touchcancel', swEnd, { passive: true });
+  document.addEventListener('touchend', end, { passive: true });
+  document.addEventListener('touchcancel', () => { if (g && g.mode === 'sheet') { const h = g.h, st = g.start; g = null; toState(h, st); } else g = null; }, { passive: true });
+  // a field gets focus on the half sheet: expand to full so the keyboard does not cover it
+  document.addEventListener('focusin', e => { const h = cardHost(); if (h && h.dataset.sheet === 'half' && sheetOk() && h.contains(e.target) && e.target.matches('input,select,textarea')) toState(h, 'full'); });
+  window.addEventListener('resize', () => { const h = cardHost(); if (h && h.dataset.sheet) { if (sheetOk()) setTop(h, topOf(h.dataset.sheet), false); else cardSheetReset(h); } });
 })();
 
 // soft edge fade on horizontally scrolling button rows (.chips, .selbar)

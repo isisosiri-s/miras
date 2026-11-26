@@ -8,14 +8,15 @@ if (IS_PC) {
   // Windows shows a tooltip on hover for icon-only buttons: reuse their aria-label
   document.addEventListener('mouseover', e => {
     const b = e.target.closest && e.target.closest('[aria-label]');
-    if (b && !b.title) { const l = b.getAttribute('aria-label'); if (l && l !== '…') b.title = l; }
+    if (b && !b.title && !b.closest('.toolbar .trow, .actions.nav, .jmpbtn, .drawer, .colhead')) { const l = b.getAttribute('aria-label'); if (l && l !== '…') b.title = l; }
   }, { passive: true });
 }
 
 async function afterUnlock() {
   await Native.setShotBlock(H.shot);
   UI.firstPaint = true; // first list build waits one frame: the app frame appears (and fades in) before the heavy work
-  const ls = UI.lockState; UI.lockState = null; // set by doLock (in memory only): restore the screen the person was on
+  let ls = UI.lockState; UI.lockState = null; // set by doLock (in memory only): restore the screen the person was on
+  if (!ls && window.loadSavedUi) ls = window.loadSavedUi(); // app was closed completely: the last screen is kept on the device
   if (ls) { UI.q = ls.q; UI.filter = ls.filter; UI.colf = ls.colf || {}; if (ls.rep) Object.assign(UI.rep, ls.rep); }
   mountShell();
   history.replaceState({ root: 1 }, '');

@@ -10,36 +10,81 @@ const rowLink = (id, title, sub) => `<button class="setrow" id="${id}"><div clas
 const segHtml = (id, opts, cur) => `<div class="seg" id="${id}">${opts.map(([v, l]) => `<button data-v="${v}" class="${String(cur) === String(v) ? 'on' : ''}">${l}</button>`).join('')}</div>`;
 
 // ---------- trash ----------
+const TR = { sel: new Set() };
 function viewTrash(main) {
   const items = DB.records.filter(r => r.del && !r.purged).sort((a, b) => b.del - a.del);
-  const rows = items.map(r => `<div class="trrow" data-u="${r.uuid}"><div class="nm"><b>${esc(r.inv || '')} · ${esc(r.title || t('title_untitled'))}</b><span>ID ${r.id} · ${t('trash_days', { n: trashDaysLeft(r) })}</span></div>
-    <button class="sbtn" data-act="restore">${t('trash_restore')}</button><button class="ib" style="color:var(--bad)" data-act="forever" aria-label="${esc(t('trash_forever'))}">${IC.trash}</button></div>`).join('');
-  pageShell(main, t('trash_title'), `<div class="hint">${t('trash_hint')}</div>
-    ${items.length ? `<div style="padding:0 12px 8px"><button class="sbtn" id="purge" style="color:var(--bad)">${IC.trash} ${t('trash_purge')}</button></div><div class="group" style="margin:6px 12px">${rows}</div>` : `<div class="empty"><b>${t('trash_empty')}</b></div>`}`);
-  $$('.trrow button', main).forEach(b => b.onclick = async () => {
-    const r = byUuid().get(b.closest('.trrow').dataset.u);
-    if (b.dataset.act === 'restore') { restoreRecords([r]); toast(t('toast_saved'), 1000); }
-    else { if (!(await confirmDlg(t('trash_purge_confirm', { n: 1 }), t('trash_forever'), true))) return; purgeRecords([r]); }
-    viewTrash(main);
+  for (const u of [...TR.sel]) if (!items.some(r => r.uuid === u)) TR.sel.delete(u);
+  const n = TR.sel.size;
+  const rows = items.map(r => { const on = TR.sel.has(r.uuid); return `<div class="trrow${on ? ' sel' : ''}" data-u="${r.uuid}"><b class="cb ${on ? 'on' : ''}" data-cb="1">${on ? IC.ok(14, 'currentColor') : ''}</b><div class="nm"><b>${esc(r.inv || '')} · ${esc(r.title || t('title_untitled'))}</b><span>ID ${r.id} · ${t('trash_days', { n: trashDaysLeft(r) })}</span></div>
+    <button class="sbtn" data-act="restore">${t('trash_restore')}</button><button class="ib" style="color:var(--bad)" data-act="forever" aria-label="${esc(t('trash_forever'))}">${IC.trash}</button></div>`; }).join('');
+  const bar = !items.length ? '' : n
+    ? `<div class="trbar"><span class="cnt">${t('sel_count', { n })}</span><button class="sbtn" id="trSelAll">${t('sel_all')}</button><button class="sbtn" id="trRestoreSel">${t('trash_restore')}</button><button class="sbtn bad" id="trForeverSel">${IC.trash} ${t('trash_forever')}</button><button class="ib" id="trNone" aria-label="${esc(t('sel_none'))}">${IC.close}</button></div>`
+    : `<div class="trbar"><button class="sbtn" id="trRestoreAll">${t('trash_restore_all')}</button><button class="sbtn bad" id="purge">${IC.trash} ${t('trash_purge')}</button></div>`;
+  pageShell(main, t('trash_title'), `${items.length ? `${bar}<div class="group" style="margin:6px 12px">${rows}</div>` : `<div class="empty"><b>${t('trash_empty')}</b></div>`}`);
+  const again = () => viewTrash(main);
+  const rec = u => byUuid().get(u);
+  $$('.trrow', main).forEach(row => row.onclick = async e => {
+    const u = row.dataset.u, bt = e.target.closest('button');
+    if (!bt) { if (TR.sel.has(u)) TR.sel.delete(u); else TR.sel.add(u); return again(); }
+    if (bt.dataset.act === 'restore') { restoreRecords([rec(u)]); toast(t('toast_saved'), 1000); }
+    else if (bt.dataset.act === 'forever') { if (!(await confirmDlg(t('trash_purge_confirm', { n: 1 }), t('trash_forever'), true))) return; purgeRecords([rec(u)]); }
+    again();
   });
-  const p = $('#purge'); if (p) p.onclick = async () => { if (await confirmDlg(t('trash_purge_confirm', { n: items.length }), t('trash_purge'), true)) { purgeRecords(items); viewTrash(main); } };
+  const on = (id, fn) => { const el = $('#' + id, main); if (el) el.onclick = fn; };
+  on('purge', async () => { if (await confirmDlg(t('trash_purge_confirm', { n: items.length }), t('trash_purge'), true)) { purgeRecords(items); TR.sel.clear(); again(); } });
+  on('trRestoreAll', () => { restoreRecords(items); toast(t('mass_done', { n: items.length }), 1400); TR.sel.clear(); again(); });
+  on('trRestoreSel', () => { const rs = [...TR.sel].map(rec).filter(Boolean); restoreRecords(rs); toast(t('mass_done', { n: rs.length }), 1400); TR.sel.clear(); again(); });
+  on('trForeverSel', async () => { const rs = [...TR.sel].map(rec).filter(Boolean); if (await confirmDlg(t('trash_purge_confirm', { n: rs.length }), t('trash_forever'), true)) { purgeRecords(rs); TR.sel.clear(); again(); } });
+  on('trSelAll', () => { items.forEach(r => TR.sel.add(r.uuid)); again(); });
+  on('trNone', () => { TR.sel.clear(); again(); });
 }
 
 // ---------- columns ----------
+// move one column to a new place among the VISIBLE-in-this-screen columns (hidden-by-setting columns keep their own slots)
+function moveColumnTo(key, to) {
+  const live = liveCols(), from = live.findIndex(c => c.key === key);
+  if (from <= 0 || to <= 0 || to >= live.length || from === to) return;
+  const slots = []; DB.columns.forEach((c, i) => { if (live.includes(c)) slots.push(i); });
+  const order = live.slice(); const [m] = order.splice(from, 1); order.splice(to, 0, m);
+  slots.forEach((si, k) => { DB.columns[si] = order[k]; }); colStamp(); scheduleSave();
+}
+function bindColDrag(main) {
+  const grp = $('.group', main); const page = $('.page', main); if (!grp || !page) return;
+  grp.addEventListener('pointerdown', e => {
+    const h = e.target.closest('.dgh'); if (!h) return; e.preventDefault();
+    const row = h.closest('.colrow'), rows = $$('.colrow', grp), from = rows.indexOf(row), rh = row.offsetHeight;
+    let y = e.clientY, y0 = e.clientY, st0 = page.scrollTop, to = from, spd = 0, raf = 0;
+    h.setPointerCapture(e.pointerId); row.classList.add('drag');
+    const apply = () => {
+      const dy = y - y0 + (page.scrollTop - st0); row.style.transform = `translateY(${dy}px)`;
+      const nt = Math.max(1, Math.min(rows.length - 1, from + Math.round(dy / rh)));
+      if (nt !== to) { to = nt; rows.forEach((r, i) => { if (r === row) return; const sh = from < to && i > from && i <= to ? -rh : from > to && i < from && i >= to ? rh : 0; r.style.transition = 'transform .15s'; r.style.transform = sh ? `translateY(${sh}px)` : ''; }); }
+    };
+    const tick = () => { if (spd) { page.scrollTop += spd; apply(); } raf = requestAnimationFrame(tick); };
+    const mv = ev => { y = ev.clientY; const r = page.getBoundingClientRect(); spd = y < r.top + 64 ? -8 : y > r.bottom - 64 ? 8 : 0; apply(); };
+    const up = () => {
+      cancelAnimationFrame(raf); h.removeEventListener('pointermove', mv); h.removeEventListener('pointerup', up); h.removeEventListener('pointercancel', up);
+      if (to !== from) { moveColumnTo(row.dataset.k, to); UI.listKey = ''; }
+      viewColumns(main); const p2 = $('.page', main); if (p2) p2.scrollTop = page.scrollTop;
+    };
+    h.addEventListener('pointermove', mv); h.addEventListener('pointerup', up); h.addEventListener('pointercancel', up); raf = requestAnimationFrame(tick);
+  });
+}
 function viewColumns(main) {
+  const sc0 = main.querySelector('.page') ? main.querySelector('.page').scrollTop : 0;
   const cols = liveCols();
   const rows = cols.map((c, i) => {
     const locked = c.kind === 'id';
-    return `<div class="colrow ${c.hidden ? 'hid' : ''}" data-k="${c.key}"><span class="nm">${esc(colName(c))}${!c.b ? `<span class="badge">${t('badge_custom')}</span>` : ''}</span>
-    ${locked ? `<span class="ib" style="opacity:.6">${IC.lock(18)}</span>` : `<button class="ib" data-a="up" ${i <= 1 ? 'disabled' : ''}>${IC.up}</button><button class="ib" data-a="down" ${i >= cols.length - 1 ? 'disabled' : ''}>${IC.down}</button>
-    <button class="ib ${onPhone(c) ? 'ph on' : 'ph'}" data-a="ph" title="${esc(t('col_phone'))}" ${(c.key === 'inv' || c.hidden) ? 'disabled' : ''}>${IC.phone}</button><button class="ib" data-a="eye" ${(builtinOf(c.key) || {}).noHide ? 'disabled' : ''}>${c.hidden ? IC.eyeoff : IC.eye}</button><button class="ib" data-a="edit">${IC.edit}</button>${!c.b ? `<button class="ib" data-a="del" style="color:var(--bad)">${IC.trash}</button>` : ''}`}</div>`;
+    return `<div class="colrow ${c.hidden ? 'hid' : ''}" data-k="${c.key}">${locked ? `<span class="ib dgl" style="opacity:.6">${IC.lock(18)}</span>` : `<button class="ib dgh" aria-label="${esc(t('nav_columns'))}">${IC.drag}</button>`}<span class="nm">${esc(colName(c))}${!c.b ? `<span class="badge">${t('badge_custom')}</span>` : ''}</span>
+    ${locked ? '' : `<button class="ib ${onPhone(c) ? 'ph on' : 'ph'}" data-a="ph" title="${esc(t('col_phone'))}" ${(c.key === 'inv' || c.hidden) ? 'disabled' : ''}>${IC.phone}</button><button class="ib" data-a="eye" ${(builtinOf(c.key) || {}).noHide ? 'disabled' : ''}>${c.hidden ? IC.eyeoff : IC.eye}</button><button class="ib" data-a="edit">${IC.edit}</button>${!c.b ? `<button class="ib" data-a="del" style="color:var(--bad)">${IC.trash}</button>` : ''}`}</div>`;
   }).join('');
   pageShell(main, t('nav_columns'), `<div class="hint">${t('cols_hint')}</div><div style="padding:0 12px 8px"><button class="sbtn pri" id="addCol">${IC.plus.replace('width="26" height="26"', 'width="18" height="18"')}${t('col_add_btn')}</button></div><div class="group" style="margin:6px 12px">${rows}</div>`);
+  { const p = main.querySelector('.page'); if (p) p.scrollTop = sc0; }
+  bindColDrag(main);
   $('#addCol').onclick = async () => { if (await colDialog(null)) viewColumns(main); };
   $$('.colrow [data-a]', main).forEach(b => b.onclick = async () => {
     const key = b.closest('.colrow').dataset.k; const c = colDef(key); const a = b.dataset.a;
-    if (a === 'up' || a === 'down') { moveColumn(key, a === 'up' ? -1 : 1); }
-    else if (a === 'ph') { c.ph = !onPhone(c); c.mts = Date.now(); colStamp(); scheduleSave(); UI.listKey = ''; }
+    if (a === 'ph') { c.ph = !onPhone(c); c.mts = Date.now(); colStamp(); scheduleSave(); UI.listKey = ''; }
     else if (a === 'eye') { c.hidden = !c.hidden; c.mts = Date.now(); colStamp(); scheduleSave(); }
     else if (a === 'edit') { await colDialog(c); }
     else if (a === 'del') {
@@ -148,20 +193,22 @@ async function viewSettings(main) {
   const alOpts = [[0, t('al_now')], [60, t('al_1')], [300, t('al_5')], [900, t('al_15')], [-1, t('al_never')]];
   const trashN = DB.records.filter(r => r.del && !r.purged).length;
   const bk = H.lastBackup ? t('set_backup_last', { d: fmtDateTime(H.lastBackup) }) : t('backup_never');
+  const G = (h, body) => `<div class="grt">${h}</div><div class="group">${body}</div>`;
   pageShell(main, t('set_title'), `
-  <div class="group"><div class="setrow col"><div class="tt">${t('set_lang')}</div>${segHtml('sLang', [['tk', 'Türkmençe'], ['ru', 'Русский'], ['en', 'English']], H.lang).replace('margin:8px 14px', '')}</div>
-  ${rowSwitch('sEnc', t('set_encrypt'), t('set_encrypt_sub'), hasPin)}${hasPin ? rowLink('sPw', t('set_password')) : ''}</div>
-  ${hasPin ? `<div class="group"><div class="setrow col"><div class="tt">${t('set_autolock')}</div><select class="inp" id="sAl">${alOpts.map(([v, l]) => `<option value="${v}" ${H.autolock === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
-  ${rowSwitch('sBio', t('set_bio'), bioOk ? t('set_bio_sub') : t('set_bio_na'), H.bio && bioOk, !bioOk)}
-  </div>`: ''}
-  <div class="group">${rowSwitch('sRest', t('set_rest'), t('set_rest_sub'), H.rest)}${H.rest ? rowSwitch('sRestUi', t('set_restui'), t('set_restui_sub'), H.restUi) : ''}</div>
-  <div class="group">${rowSwitch('sShot', t('set_shot'), Native.canBlockShots() ? t('set_shot_sub') : t('set_shot_na'), H.shot)}</div>
-  <div class="group"><div class="setrow col"><div class="tt">${t('set_theme')}</div>${segHtml('sTheme', [['light', t('theme_light')], ['dark', t('theme_dark')]], H.theme)}</div>
-  <div class="setrow col"><div class="tt">${t('anim_title')}</div>${segHtml('sAnim', [['1', t('anim_1')], ['2', t('anim_2')], ['3', t('anim_3')]], animLevel())}</div>
-  <div class="setrow col"><div class="tt">${t('set_font')}</div>${segHtml('sFont', [['s', t('font_s')], ['m', t('font_m')], ['l', t('font_l')]], H.font)}</div></div>
-  <div class="group">${rowLink('sCols', t('set_columns'))}${rowLink('sTrash', t('set_trash'), trashN ? `${trashN}` : '')}
-  <div class="setrow"><div class="tt">${t('set_backup')}<div class="ss">${bk}</div>${Native.cap ? `<div class="ss">${t('backup_warn')}</div>` : ''}</div><button class="sbtn" id="sBk">${t('set_backup_btn')}</button></div>
-  <div class="setrow"><div class="tt">${t('set_version')}</div><span class="ss">${APP_VERSION}</span></div></div>`);
+  ${G(t('set_g_look'), `<div class="setrow col"><div class="tt">${t('set_lang')}</div>${segHtml('sLang', [['tk', 'Türkmençe'], ['ru', 'Русский'], ['en', 'English']], H.lang).replace('margin:8px 14px', '')}</div>
+  <div class="setrow col"><div class="tt">${t('set_theme')}</div>${segHtml('sTheme', [['light', t('theme_light')], ['dark', t('theme_dark')]], H.theme)}</div>
+  <div class="setrow col"><div class="tt">${t('set_font')}</div>${segHtml('sFont', [['s', t('font_s')], ['m', t('font_m')], ['l', t('font_l')]], H.font)}</div>
+  <div class="setrow col"><div class="tt">${t('anim_title')}</div>${segHtml('sAnim', [['1', t('anim_1')], ['2', t('anim_2')], ['3', t('anim_3')]], animLevel())}</div>`)}
+  ${G(t('set_g_list'), `${rowSwitch('sScan', t('set_scan'), t('set_scan_sub'), H.scan !== false)}${H.scan !== false ? rowSwitch('sScanUi', t('set_scanui'), t('set_scanui_sub'), H.scanUi !== false) : ''}
+  ${rowSwitch('sRest', t('set_rest'), t('set_rest_sub'), H.rest)}${H.rest ? rowSwitch('sRestUi', t('set_restui'), t('set_restui_sub'), H.restUi) : ''}
+  ${rowLink('sCols', t('set_columns'))}`)}
+  ${G(t('set_g_sec'), `${rowSwitch('sEnc', t('set_encrypt'), t('set_encrypt_sub'), hasPin)}${hasPin ? rowLink('sPw', t('set_password')) : ''}
+  ${hasPin ? `<div class="setrow col"><div class="tt">${t('set_autolock')}</div><select class="inp" id="sAl">${alOpts.map(([v, l]) => `<option value="${v}" ${H.autolock === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
+  ${rowSwitch('sBio', t('set_bio'), bioOk ? t('set_bio_sub') : t('set_bio_na'), H.bio && bioOk, !bioOk)}` : ''}
+  ${rowSwitch('sShot', t('set_shot'), Native.canBlockShots() ? t('set_shot_sub') : t('set_shot_na'), H.shot)}`)}
+  ${G(t('set_g_data'), `${rowLink('sTrash', t('set_trash'), trashN ? `${trashN}` : '')}
+  <div class="setrow"><div class="tt">${t('set_backup')}<div class="ss">${bk}</div>${Native.cap ? `<div class="ss">${t('backup_warn')}</div>` : ''}</div><button class="sbtn" id="sBk">${t('set_backup_btn')}</button></div>`)}
+  ${G(t('set_g_about'), `<div class="setrow"><div class="tt">${t('set_version')}</div><span class="ss">${APP_VERSION}</span></div>`)}`);
   main.querySelector('.page').scrollTop = sc;
   const again = () => viewSettings(main);
   $$('#sLang button', main).forEach(b => b.onclick = async () => { await setLang(b.dataset.v); });
@@ -171,6 +218,8 @@ async function viewSettings(main) {
   });
   $$('#sAnim button', main).forEach(b => b.onclick = async () => { H.anim = +b.dataset.v; applyPrefs(); await saveHeader(); again(); });
   $$('#sFont button', main).forEach(b => b.onclick = async () => { H.font = b.dataset.v; applyPrefs(); await saveHeader(); again(); });
+  $('#sScan').onclick = async () => { H.scan = H.scan === false; if (H.scan === false && (UI.filter === 'scanned' || UI.filter === 'not')) UI.filter = 'all'; UI.listKey = ''; await saveHeader(); again(); };
+  if ($('#sScanUi')) $('#sScanUi').onclick = async () => { H.scanUi = H.scanUi === false; if (H.scanUi === false && (UI.filter === 'scanned' || UI.filter === 'not')) UI.filter = 'all'; await saveHeader(); again(); };
   $('#sRest').onclick = async () => { H.rest = !H.rest; if (!H.rest && UI.filter.includes('rest')) UI.filter = 'all'; UI.listKey = ''; await saveHeader(); again(); };
   if ($('#sRestUi')) $('#sRestUi').onclick = async () => { H.restUi = !H.restUi; if (!H.restUi && (UI.filter === 'rest' || UI.filter === 'notrest')) UI.filter = 'all'; await saveHeader(); again(); };
   if ($('#sAl')) $('#sAl').onchange = async e => { H.autolock = +e.target.value; await saveHeader(); };
@@ -315,7 +364,7 @@ function lanStatsHtml(st) {
 }
 function lanBlockHtml() {
   if (window.GaznaLan) {
-    if (!LAN.on) return `<div class="sect">${t('lan_title')}</div><div class="hint">${t('lan_pc_hint')}</div><div style="padding:6px 12px"><button class="btn b1" id="lnStart" style="width:100%">${t('lan_wait_btn')}</button>${LAN.last ? lanStatsHtml(LAN.last) : ''}</div>`;
+    if (!LAN.on) return `<div class="sect">${t('lan_title')}</div><div style="padding:6px 12px"><button class="btn b1" id="lnStart" style="width:100%">${t('lan_wait_btn')}</button>${LAN.last ? lanStatsHtml(LAN.last) : ''}</div>`;
     return `<div class="sect">${t('lan_title')}</div><div class="group lan" style="padding:12px">
       <div class="ss">${t('lan_urls')}</div>${LAN.urls.length ? LAN.urls.map(u => `<div class="lan-url">${esc(u.replace(/^http:\/\//, ''))}</div>`).join('') : `<div class="lan-url">–</div>`}
       <div class="ss" style="margin-top:8px">${t('lan_code_lbl')}</div><div class="lan-code">${esc(String(LAN.code).replace(/(\d{3})(?=\d)/g, '$1 '))}</div>
@@ -323,7 +372,7 @@ function lanBlockHtml() {
       <div style="padding:6px 12px"><button class="btn b2" id="lnStop" style="width:100%">${t('lan_stop')}</button></div>`;
   }
   if (!lanClientOk()) return '';
-  return `<div class="sect">${t('lan_title')}</div><div class="hint">${t('lan_phone_hint')}</div><div style="padding:0 12px 6px">
+  return `<div class="sect">${t('lan_title')}</div><div style="padding:0 12px 6px">
     <div class="lbl">${t('lan_addr')}</div><input class="inp" id="lnAddr" inputmode="url" autocomplete="off" placeholder="192.168.1.5:${LAN_PORT}" value="${esc(H.lanAddr || '')}">
     <div class="lbl" style="margin-top:8px">${t('lan_code')}</div><input id="lnCode" class="inp lan-in" inputmode="numeric" autocomplete="off" maxlength="11" placeholder="000 000 000">
     <button class="btn b1" id="lnGo" style="width:100%;margin-top:10px">${t('lan_go')}</button></div>`;
@@ -347,7 +396,7 @@ function bindLan(main) {
 function viewSync(main) {
   const S = UI.sync;
   if (!S) {
-    pageShell(main, t('sync_title'), `<div class="hint">${t('sync_hint')}</div><div style="display:flex;gap:10px;padding:6px 12px"><button class="btn b3" id="syCreate">${t('sync_create')}</button><button class="btn b1" id="syChoose">${t('sync_choose')}</button></div>${lanBlockHtml()}`);
+    pageShell(main, t('sync_title'), `<div style="display:flex;gap:10px;padding:6px 12px"><button class="btn b3" id="syCreate">${t('sync_create')}</button><button class="btn b1" id="syChoose">${t('sync_choose')}</button></div>${lanBlockHtml()}`);
     bindLan(main);
     $('#syCreate').onclick = async () => { const n = await createSyncFile(); if (n) toast(t('sync_created', { f: n }), 4000); };
     $('#syChoose').onclick = async () => {

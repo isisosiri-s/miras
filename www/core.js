@@ -384,7 +384,7 @@ function counts() {
 }
 
 // ---------- columns ----------
-const restOff = c => c.key === 'restored' && !H.rest;
+const restOff = c => (c.key === 'restored' && !H.rest) || (c.key === 'scanned' && H.scan === false);
 function visibleCols() { return DB.columns.filter(c => !c.del && !c.hidden && !restOff(c)); }
 // phone list: ID, inventory number, title and scan flag by default; the user can toggle any column
 const PHONE_DEFAULT = ['id', 'inv', 'title', 'scanned'];
