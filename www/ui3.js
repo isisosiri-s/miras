@@ -13,6 +13,8 @@ function statsBlock(title, rows, total) {
   return `<div class="group" style="margin:10px 12px"><div class="setrow col"><div class="tt">${esc(title)}</div>${rows.map(([k, n]) => `<div style="margin:6px 0"><div style="display:flex;justify-content:space-between;gap:10px"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(k)}</span><span class="ss">${n}${total ? ` · ${(n * 100 / total).toFixed(1).replace('.', LANG === 'en' ? '.' : ',')}%` : ''}</span></div><div style="height:6px;border-radius:3px;background:var(--chip);margin-top:3px"><div style="height:6px;border-radius:3px;background:var(--accent);width:${Math.max(2, n * 100 / mx)}%"></div></div></div>`).join('')}</div></div>`;
 }
 function viewStats(main) {
+  const ck = `${DB.rev}|${LANG}|${H.scan}|${H.rest}|${H.theme}`; // the numbers only change with the data: reopening the screen reuses the finished page
+  if (UI._st && UI._st.k === ck) { pageShell(main, t('nav_stats'), UI._st.body); return; }
   const c = counts(); const live = DB.records.filter(isLive);
   const pct = n => c.total ? (n * 100 / c.total).toFixed(1).replace('.', LANG === 'en' ? '.' : ',') + '%' : '–';
   let pages = 0, pn = 0; for (const r of live) { const v = typeof r.pages === 'number' ? r.pages : parseNum(String(r.pages ?? '')); if (typeof v === 'number' && isFinite(v)) { pages += v; pn++; } }
@@ -31,6 +33,7 @@ function viewStats(main) {
     ${H.rest ? row(card(t('st_rest'), c.rest, pct(c.rest)), card(t('st_notrest'), c.total - c.rest, pct(c.total - c.rest))) : ''}
     ${row(card(t('st_pages'), fmtNum(pages)), card(t('st_trash'), DB.records.filter(r => r.del && !r.purged).length))}
     ${statsBlock(t('st_types'), types, c.total)}${statsBlock(t('st_langs'), statsTop('lang', 10), c.total)}${statsBlock(t('st_locs'), statsTop('loc', 10), c.total)}${statsBlock(t('st_authors'), statsTop('author', 10), c.total)}`;
+  UI._st = { k: ck, body };
   pageShell(main, t('nav_stats'), body);
 }
 

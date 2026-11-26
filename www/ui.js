@@ -387,7 +387,12 @@ function applyLayout(cols) {
   for (const k of ['cb', 'id', 'inv']) tw.style.setProperty('--l-' + k, (o.L[k] || 0) + 'px');
 }
 // sticky (frozen) left columns: checkbox, ID, inventory number (left offsets come from CSS variables)
-function stickyLefts(cols) {
+let _slC = null, _slS = null, _slW = null, _slV = null;
+function stickyLefts(cols) { // the same answer for every row of one render: compute once
+  const w = isWide(), sm = !!UI.selMode; if (_slC === cols && _slS === sm && _slW === w) return _slV;
+  _slV = stickyLeftsRaw(cols); _slC = cols; _slS = sm; _slW = w; return _slV;
+}
+function stickyLeftsRaw(cols) {
   const o = {};
   if (isWide() || UI.selMode) { o.cb = 0; o.first = 'cb'; }
   if (cols[0] && cols[0].kind === 'id') { o.id = 0; if (!o.first) o.first = 'id'; if (cols[1] && cols[1].key === 'inv') { o.inv = 0; o.last = 'inv'; } else o.last = 'id'; }
@@ -398,10 +403,13 @@ const cellVal = (c, r) => String(cellText(c, r) ?? '').trim();
 function sortKeyOf(c, r) { if (c.kind === 'id') return r.id; if (c.kind === 'number') { const v = r[c.key]; return v === '' || v == null ? null : (typeof v === 'number' ? v : parseNum(String(v))); } if (c.kind === 'check') return r[c.key] ? 1 : 0; const v = cellVal(c, r); return v ? norm(v).replace(/\d+/g, m => m.padStart(12, '0')) : null; }
 function computeList() {
   const cf = UI.colf || {};
-  const key = `${DB.rev}|${UI.q}|${UI.filter}|${UI.sort ? UI.sort.key + UI.sort.dir : ''}|${Object.keys(cf).map(k => k + ':' + cf[k].join('\u0001')).join('|')}`;
+  const base = `${UI.filter}|${UI.sort ? UI.sort.key + UI.sort.dir : ''}|${Object.keys(cf).map(k => k + ':' + cf[k].join('\u0001')).join('|')}`; // everything except the revision and the query text
+  const key = `${DB.rev}|${UI.q}|${base}`;
   if (UI.listKey === key) return UI.list;
-  const toks = norm(UI.q).split(' ').filter(Boolean);
-  let l = DB.records.filter(isLive);
+  const nq = norm(UI.q), toks = nq.split(' ').filter(Boolean);
+  const S = UI._srch; let l;
+  if (toks.length && S && S.rev === DB.rev && S.base === base && S.nq && nq.startsWith(S.nq) && S.list) l = S.list.slice(); // typing one more letter: narrow the previous result instead of scanning all records
+  else l = DB.records.filter(isLive);
   if (UI.filter === 'scanned') l = l.filter(r => r.scanned); else if (UI.filter === 'not') l = l.filter(r => !r.scanned);
   else if (UI.filter === 'pin') l = l.filter(r => r.pin);
   else if (UI.filter === 'rest') l = l.filter(r => r.restored); else if (UI.filter === 'notrest') l = l.filter(r => !r.restored);
@@ -413,7 +421,7 @@ function computeList() {
     const ks = new Map(l.map(r => [r, sortKeyOf(c, r)]));
     l.sort((a, b) => { const x = ks.get(a), y = ks.get(b); if (x === null && y === null) return a.id - b.id; if (x === null) return 1; if (y === null) return -1; return (x < y ? -d : x > y ? d : 0) || (a.id - b.id); });
   } else l.sort((a, b) => a.id - b.id);
-  UI.list = l; UI.listKey = key; return l;
+  UI.list = l; UI.listKey = key; UI._srch = toks.length ? { rev: DB.rev, base, nq, list: l } : null; return l;
 }
 function viewBooks(main) {
   main.classList.remove('hdrhide');
@@ -485,7 +493,7 @@ function renderChips() {
   $$('.ftile', c).forEach(b => b.onclick = () => { UI.filter = b.dataset.f; renderChips(); refreshList(); const w = $('#tw'); if (w) w.scrollTop = 0; });
   const nf = Object.keys(UI.colf || {}).length, fc = $('#fchip');
   if (fc) { fc.classList.toggle('hidden', !nf); $('#fchipB').innerHTML = IC.funnel + '<b>' + nf + '</b>'; }
-  const rec = $('#tbRec'), pn = $('#tbPin'), hasPin = UI.filter === 'pin' || DB.records.some(r => r.pin && isLive(r));
+  const rec = $('#tbRec'), pn = $('#tbPin'), hasPin = UI.filter === 'pin' || (UI._pinRev === DB.rev ? UI._pinAny : (UI._pinRev = DB.rev, UI._pinAny = DB.records.some(r => r.pin && isLive(r))));
   if (rec) rec.classList.toggle('on', UI.filter === 'recent');
   if (pn) { pn.classList.toggle('hidden', !hasPin); pn.classList.toggle('on', UI.filter === 'pin'); }
 }
@@ -522,9 +530,9 @@ function bindResize() {
   th.addEventListener('click', e => { if (e.target.closest('.rz')) { e.stopPropagation(); return; } const sp = e.target.closest('#th>span[data-k]'); if (sp) colMenu(sp.dataset.k); });
 }
 // ---- virtualised list: only the rows near the viewport exist in the DOM (fixed row height) ----
-const VBUF0 = 10, VBUFMAX = 72; // rows kept above / below the viewport (grows with the scroll speed: a fast fling must not outrun the drawn rows); the window is rebuilt only when the view gets within VMARGIN rows of its edge
-let VBUF = VBUF0, VMARGIN = 4;
-function setBuf(rowsPerFrame) { VBUF = Math.max(VBUF0, Math.min(VBUFMAX, VBUF0 + Math.ceil(rowsPerFrame * 6))); VMARGIN = Math.max(4, Math.round(VBUF / 3)); }
+const VBUF0 = 5, VBUFMAX = 72; // rows kept above / below the viewport (grows with the scroll speed: a fast fling must not outrun the drawn rows); the window is rebuilt only when the view gets within VMARGIN rows of its edge
+let VBUF = VBUF0, VMARGIN = 2;
+function setBuf(rowsPerFrame) { VBUF = Math.max(VBUF0, Math.min(VBUFMAX, VBUF0 + Math.ceil(rowsPerFrame * 6))); VMARGIN = Math.max(2, Math.round(VBUF / 3)); }
 UI.sort = null; UI.colf = {};
 UI.vr = { rh: 66, from: -1, to: -1, cols: null, raf: 0 };
 // row height = font size x --row-em (4.1 on phones: two-line titles, big touch rows; denser on the Windows app)
@@ -627,7 +635,7 @@ function bindRail() {
     clearTimeout(tTrail); if (ty !== null && lastK !== null) { tw.scrollTop = lastK * maxS; renderWindow(false); }
     r.classList.remove('on'); ty = null; if (raf) { cancelAnimationFrame(raf); raf = 0; } UI.vr.drag = false; rb0 = null; updateRail();
     // top the row window up in small steps instead of one big rebuild (one 180 ms frame on a weak phone)
-    upT.forEach(clearTimeout); upT = [6, 8, 10].map((n, i) => setTimeout(() => { if (UI.vr.drag) return; VBUF = n; VMARGIN = Math.max(1, Math.round(n / 3)); renderWindow('idle'); }, 120 + i * 140));
+    upT.forEach(clearTimeout); upT = [6, 8].map((n, i) => setTimeout(() => { if (UI.vr.drag) return; VBUF = n; VMARGIN = Math.max(1, Math.round(n / 3)); renderWindow('idle'); }, 120 + i * 140));
   }; r.addEventListener('pointerup', up); r.addEventListener('pointercancel', up);
   UI.railBench = { down: y => { r.classList.add('on'); UI.vr.drag = true; lastI = -1; rb0 = null; nextR = 0; VBUF = 2; VMARGIN = 1; go({ clientY: y }); }, move: y => go({ clientY: y }), up }; // used by the built-in smoothness test (synthetic pointers cannot be captured)
   const jb = $('#jmpbtn');
@@ -707,7 +715,7 @@ async function colFilterDlg(c) {
 function refreshList() {
   if (UI.route !== 'books') return;
   const list = computeList(); const cols = tableCols();
-  applyLayout(cols); renderHead(cols, '');
+  applyLayout(cols); renderHead(cols, ''); UI._lastRev = DB.rev; UI._lastKey = UI.listKey;
   const rows = $('#rows'), tw = $('#tw'); if (!rows) return;
   const total = counts();
   const v = UI.vr; v.cols = cols; v.rh = rowHeightPx(); tw.style.setProperty('--rh', v.rh + 'px');
@@ -1013,7 +1021,16 @@ function applyCardVals(v) {
     else el.value = (typeof v[c.key] === 'number' ? String(v[c.key]).replace('.', LANG === 'en' ? '.' : ',') : (v[c.key] ?? ''));
   }
 }
-function refreshListRowsOnly() { if (UI.route === 'books') refreshList(); }
+function markCurRow() { // the row of the open card is highlighted: toggle one class instead of rebuilding the whole list behind the card
+  const rows = $('#rows'); if (!rows) return; const u = UI.card && UI.card.uuid;
+  rows.querySelectorAll('.tr.cur').forEach(e => { if (e.dataset.u !== u) e.classList.remove('cur'); });
+  if (u) { const r = rows.querySelector(`.tr[data-u="${CSS.escape(u)}"]`); if (r) r.classList.add('cur'); }
+}
+function refreshListRowsOnly() {
+  if (UI.route !== 'books') return;
+  if (UI._lastRev === DB.rev && UI._lastKey === UI.listKey && UI.listKey) { markCurRow(); return; } // nothing changed in the data: no rebuild
+  refreshList();
+}
 function readCard() {
   const host = $('#cardhost'); const vals = {};
   for (const c of cardCols()) { if (c.kind === 'id') continue; const v = readInput(c, host); if (v !== undefined) vals[c.key] = v; }
